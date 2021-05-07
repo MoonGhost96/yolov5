@@ -16,8 +16,6 @@ from utils.datasets import letterbox
 from utils.general import non_max_suppression, make_divisible, scale_coords, increment_path, xyxy2xywh, save_one_box
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import time_synchronized
-from models.eca_module import eca_layer
-from models.cbam_module import ChannelAttention, SpatialAttention
 
 
 def autopad(k, p=None):  # kernel, padding
@@ -30,6 +28,68 @@ def autopad(k, p=None):  # kernel, padding
 def DWConv(c1, c2, k=1, s=1, act=True):
     # Depthwise convolution
     return Conv(c1, c2, k, s, g=math.gcd(c1, c2), act=act)
+
+
+class eca_layer(nn.Module):
+    """Constructs a ECA module.
+    Args:
+        channel: Number of channels of the input feature map
+        k_size: Adaptive selection of kernel size
+    """
+
+    def __init__(self, k_size=3):
+        super(eca_layer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # x: input features with shape [b, c, h, w]
+        b, c, h, w = x.size()
+
+        # feature descriptor on the global spatial information
+        y = self.avg_pool(x)
+
+        # Two different branches of ECA module
+        y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+
+        # Multi-scale information fusion
+        y = self.sigmoid(y)
+
+        return x * y.expand_as(x)
+
+
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        self.fc = nn.Sequential(nn.Conv2d(in_planes, in_planes // 16, 1, bias=False),
+                                nn.ReLU(),
+                                nn.Conv2d(in_planes // 16, in_planes, 1, bias=False))
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc(self.avg_pool(x))
+        max_out = self.fc(self.max_pool(x))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return self.sigmoid(x)
 
 
 class Conv(nn.Module):
@@ -93,17 +153,34 @@ class TransformerBlock(nn.Module):
         return x
 
 
+# class Bottleneck(nn.Module):
+#     # Standard bottleneck
+#     def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
+#         super(Bottleneck, self).__init__()
+#         c_ = int(c2 * e)  # hidden channels
+#         self.cv1 = Conv(c1, c_, 1, 1)
+#         self.cv2 = Conv(c_, c2, 3, 1, g=g)
+#         self.add = shortcut and c1 == c2
+#
+#     def forward(self, x):
+#         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+
 class Bottleneck(nn.Module):
-    # Standard bottleneck
+    # Standard bottleneck with eca and cbam
     def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
         super(Bottleneck, self).__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_, c2, 3, 1, g=g)
         self.add = shortcut and c1 == c2
+        self.eca = eca_layer()
+        self.sa = SpatialAttention()
 
     def forward(self, x):
-        return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+        y = self.cv2(self.cv1(x))
+        y = self.eca(y)
+        y = self.sa(y) * y
+        return x + y if self.add else y
 
 
 class BottleneckCSP(nn.Module):
