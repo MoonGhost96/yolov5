@@ -37,8 +37,13 @@ class eca_layer(nn.Module):
         k_size: Adaptive selection of kernel size
     """
 
-    def __init__(self, k_size=3):
+    def __init__(self, channel=0, k_size=3):
         super(eca_layer, self).__init__()
+        if channel != 0:
+            # print("channel",channel)
+            t = int(abs((math.log(channel, 2) + 1) / 2))
+            k_size = t if t % 2 else t + 1
+            # print("k_size",k_size)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
@@ -211,7 +216,7 @@ class Bottleneck(nn.Module):
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_, c2, 3, 1, g=g)
         self.add = shortcut and c1 == c2
-        self.eca = eca_layer()
+        self.eca = eca_layer(0)
         self.sa = SpatialAttention()
 
     def forward(self, x):
@@ -248,12 +253,14 @@ class C3(nn.Module):
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.eca = eca_layer()
+        self.eca = eca_layer(c_)
         self.sa = SpatialAttention()
 
     def forward(self, x):
+        # print("before:",x.shape)
         y1 = self.m(self.cv1(x))
         y2 = self.cv2(x)
+        # print("after:",x.shape)
         y1 = self.eca(y1)
         y1 = self.sa(y1)
         return self.cv3(torch.cat((y1, y2), dim=1))
