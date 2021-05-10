@@ -77,6 +77,21 @@ class ChannelAttention(nn.Module):
         return self.sigmoid(out)
 
 
+# class SpatialAttention(nn.Module):
+#     def __init__(self, kernel_size=7):
+#         super(SpatialAttention, self).__init__()
+#
+#         self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+#         self.sigmoid = nn.Sigmoid()
+#
+#     def forward(self, x):
+#         avg_out = torch.mean(x, dim=1, keepdim=True)
+#         max_out, _ = torch.max(x, dim=1, keepdim=True)
+#         x = torch.cat([avg_out, max_out], dim=1)
+#         x = self.conv1(x)
+#         return self.sigmoid(x)
+
+
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
@@ -87,9 +102,9 @@ class SpatialAttention(nn.Module):
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
-        x = torch.cat([avg_out, max_out], dim=1)
-        x = self.conv1(x)
-        return self.sigmoid(x)
+        y = torch.cat([avg_out, max_out], dim=1)
+        y = self.conv1(y)
+        return x*self.sigmoid(y)
 
 
 class MetaAconC(nn.Module):
@@ -201,8 +216,6 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         y = self.cv2(self.cv1(x))
-        # y = self.eca(y)
-        # y = self.sa(y) * y
         return x + y if self.add else y
 
 
@@ -242,7 +255,7 @@ class C3(nn.Module):
         y1 = self.m(self.cv1(x))
         y2 = self.cv2(x)
         y1 = self.eca(y1)
-        y1 = self.sa(y1) * y1
+        y1 = self.sa(y1)
         return self.cv3(torch.cat((y1, y2), dim=1))
         # return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
 

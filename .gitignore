@@ -251,3 +251,4 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 nohup.out
+weights/*
