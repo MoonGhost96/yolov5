@@ -216,8 +216,6 @@ class Bottleneck(nn.Module):
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_, c2, 3, 1, g=g)
         self.add = shortcut and c1 == c2
-        self.eca = eca_layer(0)
-        self.sa = SpatialAttention()
 
     def forward(self, x):
         y = self.cv2(self.cv1(x))
