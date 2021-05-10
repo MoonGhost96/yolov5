@@ -109,7 +109,23 @@ class SpatialAttention(nn.Module):
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         y = torch.cat([avg_out, max_out], dim=1)
         y = self.conv1(y)
-        return x*self.sigmoid(y)
+        return x * self.sigmoid(y)
+
+
+class MySpatialAttention(nn.Module):
+    def __init__(self, kernel_size=[5, 7, 9]):
+        super(MySpatialAttention, self).__init__()
+        self.m = nn.ModuleList([Conv(2,1,x,1,x//2) for x in kernel_size])
+        self.conv1 = nn.Conv2d(3, 1, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        y = torch.cat([avg_out, max_out], dim=1)
+        y = torch.cat([m(y) for m in self.m],dim=1)
+        y = self.conv1(y)
+        return x * self.sigmoid(y)
 
 
 class MetaAconC(nn.Module):
@@ -140,7 +156,6 @@ class Conv(nn.Module):
         super(Conv, self).__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = nn.BatchNorm2d(c2)
-        self.act = MetaAconC(c2)
         self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
 
     def forward(self, x):
@@ -252,7 +267,7 @@ class C3(nn.Module):
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
         self.eca = eca_layer(c_)
-        self.sa = SpatialAttention()
+        self.sa = MySpatialAttention()
 
     def forward(self, x):
         # print("before:",x.shape)
