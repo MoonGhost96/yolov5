@@ -82,21 +82,6 @@ class ChannelAttention(nn.Module):
         return self.sigmoid(out)
 
 
-# class SpatialAttention(nn.Module):
-#     def __init__(self, kernel_size=7):
-#         super(SpatialAttention, self).__init__()
-#
-#         self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
-#         self.sigmoid = nn.Sigmoid()
-#
-#     def forward(self, x):
-#         avg_out = torch.mean(x, dim=1, keepdim=True)
-#         max_out, _ = torch.max(x, dim=1, keepdim=True)
-#         x = torch.cat([avg_out, max_out], dim=1)
-#         x = self.conv1(x)
-#         return self.sigmoid(x)
-
-
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
@@ -109,7 +94,7 @@ class SpatialAttention(nn.Module):
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         y = torch.cat([avg_out, max_out], dim=1)
         y = self.conv1(y)
-        return x*self.sigmoid(y)
+        return x * self.sigmoid(y)
 
 
 class MetaAconC(nn.Module):
@@ -196,18 +181,6 @@ class TransformerBlock(nn.Module):
         return x
 
 
-# class Bottleneck(nn.Module):
-#     # Standard bottleneck
-#     def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
-#         super(Bottleneck, self).__init__()
-#         c_ = int(c2 * e)  # hidden channels
-#         self.cv1 = Conv(c1, c_, 1, 1)
-#         self.cv2 = Conv(c_, c2, 3, 1, g=g)
-#         self.add = shortcut and c1 == c2
-#
-#     def forward(self, x):
-#         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
-
 class Bottleneck(nn.Module):
     # Standard bottleneck with eca and cbam
     def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
@@ -243,7 +216,7 @@ class BottleneckCSP(nn.Module):
 
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(C3, self).__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -251,18 +224,13 @@ class C3(nn.Module):
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.eca = eca_layer(c_)
-        self.sa = SpatialAttention()
+        self.attn = nn.Sequential(eca_layer(c_), SpatialAttention()) if attn else nn.Identity()
 
     def forward(self, x):
-        # print("before:",x.shape)
         y1 = self.m(self.cv1(x))
         y2 = self.cv2(x)
-        # print("after:",x.shape)
-        y1 = self.eca(y1)
-        y1 = self.sa(y1)
+        y1 = self.attn(y1)
         return self.cv3(torch.cat((y1, y2), dim=1))
-        # return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
 
 
 class C3TR(C3):
