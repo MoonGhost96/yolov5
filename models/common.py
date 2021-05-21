@@ -79,7 +79,7 @@ class ChannelAttention(nn.Module):
         avg_out = self.fc(self.avg_pool(x))
         max_out = self.fc(self.max_pool(x))
         out = avg_out + max_out
-        return self.sigmoid(out)
+        return x*self.sigmoid(out)
 
 
 class SpatialAttention(nn.Module):
@@ -224,7 +224,7 @@ class C3(nn.Module):
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.attn = nn.Sequential(eca_layer(c_), SpatialAttention()) if attn else nn.Identity()
+        self.attn = nn.Sequential(SpatialAttention(), eca_layer(c_)) if attn else nn.Identity()
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
