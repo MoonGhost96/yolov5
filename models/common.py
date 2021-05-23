@@ -87,13 +87,14 @@ class SpatialAttention(nn.Module):
         super(SpatialAttention, self).__init__()
 
         self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.bn = nn.BatchNorm2d(1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         y = torch.cat([avg_out, max_out], dim=1)
-        y = self.conv1(y)
+        y = self.bn(self.conv1(y))
         return x * self.sigmoid(y)
 
 
