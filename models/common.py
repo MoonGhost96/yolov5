@@ -124,6 +124,7 @@ class SpatialAttention(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        print(x.shape)
         conv_out = self.conv1(x)
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
@@ -228,7 +229,7 @@ class BottleneckCSP(nn.Module):
 
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, g=1,
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, s_kernel=7, g=1,
                  e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(C3, self).__init__()
         c_ = int(c2 * e)  # hidden channels
@@ -237,7 +238,7 @@ class C3(nn.Module):
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.attn = nn.Sequential(SpatialAttention(c_), eca_layer(c_)) if attn else nn.Identity()
+        self.attn = nn.Sequential(SpatialAttention(c_, s_kernel), eca_layer(c_)) if attn else nn.Identity()
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
