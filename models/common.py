@@ -597,6 +597,7 @@ class InvertedResidual(nn.Module):
     def forward(self, x):
         y = self.conv(x)
         if self.identity:
-            return x + y
+            out = x + y
         else:
-            return y
+            out = y
+        return out
