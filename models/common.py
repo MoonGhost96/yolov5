@@ -217,7 +217,7 @@ class BottleneckCSP(nn.Module):
 
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, g=1,
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, cc=False, g=1,
                  e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super(C3, self).__init__()
         c_ = int(c2 * e)  # hidden channels
@@ -227,12 +227,18 @@ class C3(nn.Module):
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
         self.attn = nn.Sequential(SpatialAttention(), eca_layer(c_)) if attn else nn.Identity()
+        self.cc = None
+        if cc:
+            self.cc = CoordAtt(c2, c2)
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
         y2 = self.cv2(x)
         y1 = self.attn(y1)
-        return self.cv3(torch.cat((y1, y2), dim=1))
+        out = self.cv3(torch.cat((y1, y2), dim=1))
+        if isinstance(self.cc, nn.Module):
+            out = self.cc(out)
+        return out
 
 
 class C3TR(C3):
@@ -624,8 +630,6 @@ class InvertedResidual(nn.Module):
                 # Squeeze-and-Excite
                 SELayer(hidden_dim) if use_se else nn.Sequential(),
                 h_swish() if use_hs else nn.ReLU(inplace=True),
-                # coordinate attention
-                CoordAtt(hidden_dim, hidden_dim),
                 # pw-linear
                 nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
                 nn.BatchNorm2d(oup),
