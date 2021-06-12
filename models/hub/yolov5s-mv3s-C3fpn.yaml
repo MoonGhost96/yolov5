@@ -28,12 +28,12 @@ backbone:
 
 # YOLOv5 FPN head
 head:
-  [[-1, 1, C3, [256, False]],  # 12 (P5/32-large)
+  [[-1, 1, C3, [128, False]],  # 12 (P5/32-large)
 
    [-1, 1, nn.Upsample, [None, 2, 'nearest']],
    [[-1, 8], 1, Concat, [1]],  # cat backbone P4
-   [-1, 1, Conv, [128, 1, 1]],
-   [-1, 1, C3, [128, False]],  # 16 (P4/16-medium)
+   [-1, 1, Conv, [64, 1, 1]],
+   [-1, 1, C3, [64, False]],  # 16 (P4/16-medium)
 
    [[16, 12], 1, Detect, [nc, anchors]],  # Detect(P4, P5)
   ]
