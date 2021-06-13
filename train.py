@@ -168,8 +168,6 @@ def train(hyp, opt, device, tb_writer=None):
             assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
             if opt.stop:
                 epochs = start_epoch + 1
-            elif opt.add_epochs > 0:
-                epochs += opt.add_epochs
         if epochs < start_epoch:
             logger.info('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
                         (weights, ckpt['epoch'], epochs))
@@ -254,9 +252,7 @@ def train(hyp, opt, device, tb_writer=None):
                 f'Starting training for {epochs} epochs...')
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         model.train()
-        if opt.nostop:
-            if epoch == epochs - 1:
-                exit()
+
         # Update image weights (optional)
         if opt.image_weights:
             # Generate indices
@@ -467,12 +463,10 @@ if __name__ == '__main__':
     parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
-    parser.add_argument('--add-epochs', type=int, default=0)
     parser.add_argument('--stop', action='store_true', help='stop the train when resume')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true', help='only test final epoch')
     parser.add_argument('--noautoanchor', action='store_true', help='disable autoanchor check')
-    parser.add_argument('--nostop', action='store_true', help='stop when last epoch')
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
     parser.add_argument('--cache-images', action='store_true', help='cache images for faster training')
@@ -509,7 +503,6 @@ if __name__ == '__main__':
     wandb_run = check_wandb_resume(opt)
     if opt.resume and not wandb_run:  # resume an interrupted run
         stop = opt.stop
-        add = opt.add_epochs
         ckpt = opt.resume if isinstance(opt.resume, str) else get_latest_run()  # specified or most recent path
         assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
         apriori = opt.global_rank, opt.local_rank
@@ -518,7 +511,6 @@ if __name__ == '__main__':
         opt.cfg, opt.weights, opt.resume, opt.batch_size, opt.global_rank, opt.local_rank = \
             '', ckpt, True, opt.total_batch_size, *apriori  # reinstate
         opt.stop = stop
-        opt.add_epochs = add
         logger.info('Resuming training from %s' % ckpt)
     else:
         # opt.hyp = opt.hyp or ('hyp.finetune.yaml' if opt.weights else 'hyp.scratch.yaml')
