@@ -227,17 +227,12 @@ class C3(nn.Module):
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
         self.attn = nn.Sequential(SpatialAttention(), eca_layer(c_)) if attn else nn.Identity()
-        self.ca = None
-        if ca:
-            self.ca = CoordAtt(c2, c2)
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
         y2 = self.cv2(x)
         y1 = self.attn(y1)
         out = self.cv3(torch.cat((y1, y2), dim=1))
-        if isinstance(self.ca, nn.Module):
-            out = self.ca(out)
         return out
 
 
