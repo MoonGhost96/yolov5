@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from models.common import Conv, DWConv
+from models.common import Conv, DWConv, eca_layer, SpatialAttention
 from utils.google_utils import attempt_download
 
 
@@ -69,6 +69,26 @@ class GhostBottleneck(nn.Module):
 
     def forward(self, x):
         return self.conv(x) + self.shortcut(x)
+
+
+class GhostC3(nn.Module):
+    # CSP Bottleneck with 3 convolutions
+    def __init__(self, c1, c2, n=1, attn=False,
+                 e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super(GhostC3, self).__init__()
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, c_, 1, 1)
+        self.cv2 = Conv(c1, c_, 1, 1)
+        self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
+        self.m = nn.Sequential(*[GhostBottleneck(c_, c_) for _ in range(n)])
+        self.attn = nn.Sequential(SpatialAttention(), eca_layer(c_)) if attn else nn.Identity()
+
+    def forward(self, x):
+        y1 = self.m(self.cv1(x))
+        y2 = self.cv2(x)
+        y1 = self.attn(y1)
+        out = self.cv3(torch.cat((y1, y2), dim=1))
+        return out
 
 
 class MixConv2d(nn.Module):
