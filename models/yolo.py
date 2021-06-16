@@ -301,6 +301,8 @@ if __name__ == '__main__':
     print("test shape:")
     input = torch.randn(1,3,640,640,device=device)
     out = model(input)
+    for i in out:
+        print(i.shape)
 
 
 
