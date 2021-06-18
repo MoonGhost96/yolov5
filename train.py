@@ -22,7 +22,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-import test  # import test.py to get mAP after each epoch
+import test  # for end-of-epoch mAP
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
@@ -39,8 +39,10 @@ from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 logger = logging.getLogger(__name__)
 
 
-def train(hyp, opt, device, tb_writer=None):
-    logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
+def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+          opt,
+          device,
+          ):
     save_dir, epochs, batch_size, total_batch_size, weights, rank, single_cls = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.total_batch_size, opt.weights, opt.global_rank, \
         opt.single_cls
@@ -51,6 +53,12 @@ def train(hyp, opt, device, tb_writer=None):
     last = wdir / 'last.pt'
     best = wdir / 'best.pt'
     results_file = save_dir / 'results.txt'
+
+    # Hyperparameters
+    if isinstance(hyp, str):
+        with open(hyp) as f:
+            hyp = yaml.safe_load(f)  # load hyps dict
+    logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
 
     # Save run settings
     with open(save_dir / 'hyp.yaml', 'w') as f:
@@ -65,9 +73,16 @@ def train(hyp, opt, device, tb_writer=None):
     with open(opt.data) as f:
         data_dict = yaml.safe_load(f)  # data dict
 
-    # Logging- Doing this before checking the dataset. Might update data_dict
-    loggers = {'wandb': None}  # loggers dict
+    # Loggers
+    loggers = {'wandb': None, 'tb': None}  # loggers dict
     if rank in [-1, 0]:
+        # TensorBoard
+        if not opt.evolve:
+            prefix = colorstr('tensorboard: ')
+            logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
+            loggers['tb'] = SummaryWriter(opt.save_dir)
+
+        # W&B
         opt.hyp = hyp  # add hyperparameters
         run_id = torch.load(weights).get('wandb_id') if weights.endswith('.pt') and os.path.isfile(weights) else None
         wandb_logger = WandbLogger(opt, save_dir.stem, run_id, data_dict)
@@ -212,8 +227,8 @@ def train(hyp, opt, device, tb_writer=None):
             # model._initialize_biases(cf.to(device))
             if plots:
                 plot_labels(labels, names, save_dir, loggers)
-                if tb_writer:
-                    tb_writer.add_histogram('classes', c, 0)
+                if loggers['tb']:
+                    loggers['tb'].add_histogram('classes', c, 0)  # TensorBoard
 
             # Anchors
             if not opt.noautoanchor:
@@ -334,18 +349,18 @@ def train(hyp, opt, device, tb_writer=None):
                 if plots and ni < 3:
                     f = save_dir / f'train_batch{ni}.jpg'  # filename
                     Thread(target=plot_images, args=(imgs, targets, paths, f), daemon=True).start()
-                    if tb_writer and ni == 0:
+                    if loggers['tb'] and ni == 0:  # TensorBoard
                         with warnings.catch_warnings():
                             warnings.simplefilter('ignore')  # suppress jit trace warning
-                            tb_writer.add_graph(torch.jit.trace(de_parallel(model), imgs[0:1], strict=False), [])
+                            loggers['tb'].add_graph(torch.jit.trace(de_parallel(model), imgs[0:1], strict=False), [])
                 elif plots and ni == 10 and wandb_logger.wandb:
                     wandb_logger.log({'Mosaics': [wandb_logger.wandb.Image(str(x), caption=x.name) for x in
                                                   save_dir.glob('train*.jpg') if x.exists()]})
 
             # end batch ------------------------------------------------------------------------------------------------
-        
+
         # Scheduler
-        lr = [x['lr'] for x in optimizer.param_groups]  # for tensorboard
+        lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
         scheduler.step()
 
         # DDP process 0 or single-GPU
@@ -378,8 +393,8 @@ def train(hyp, opt, device, tb_writer=None):
                     'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
                     'x/lr0', 'x/lr1', 'x/lr2']  # params
             for x, tag in zip(list(mloss[:-1]) + list(results) + lr, tags):
-                if tb_writer:
-                    tb_writer.add_scalar(tag, x, epoch)  # tensorboard
+                if loggers['tb']:
+                    loggers['tb'].add_scalar(tag, x, epoch)  # TensorBoard
                 if wandb_logger.wandb:
                     wandb_logger.log({tag: x})  # W&B
 
@@ -406,12 +421,11 @@ def train(hyp, opt, device, tb_writer=None):
                     torch.save(ckpt, best)
                 if wandb_logger.wandb:
                     if ((epoch + 1) % opt.save_period == 0 and not final_epoch) and opt.save_period != -1:
-                        wandb_logger.log_model(
-                            last.parent, opt, epoch, fi, best_model=best_fitness == fi)
+                        wandb_logger.log_model(last.parent, opt, epoch, fi, best_model=best_fitness == fi)
                 del ckpt
 
         # end epoch ----------------------------------------------------------------------------------------------------
-    # end training
+    # end training -----------------------------------------------------------------------------------------------------
     if rank in [-1, 0]:
         logger.info(f'{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
         if plots:
@@ -491,8 +505,8 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     # Set DDP variables
-    opt.world_size = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
-    opt.global_rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
+    opt.world_size = int(getattr(os.environ, 'WORLD_SIZE', 1))
+    opt.global_rank = int(getattr(os.environ, 'RANK', -1))
     set_logging(opt.global_rank)
     if opt.global_rank in [-1, 0]:
         check_git_status()
@@ -531,19 +545,10 @@ if __name__ == '__main__':
         assert not opt.image_weights, '--image-weights argument is not compatible with DDP training'
         opt.batch_size = opt.total_batch_size // opt.world_size
 
-    # Hyperparameters
-    with open(opt.hyp) as f:
-        hyp = yaml.safe_load(f)  # load hyps
-
     # Train
     logger.info(opt)
     if not opt.evolve:
-        tb_writer = None  # init loggers
-        if opt.global_rank in [-1, 0]:
-            prefix = colorstr('tensorboard: ')
-            logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
-            tb_writer = SummaryWriter(opt.save_dir)  # Tensorboard
-        train(hyp, opt, device, tb_writer)
+        train(opt.hyp, opt, device)
 
     # Evolve hyperparameters (optional)
     else:
@@ -577,6 +582,8 @@ if __name__ == '__main__':
                 'mosaic': (1, 0.0, 1.0),  # image mixup (probability)
                 'mixup': (1, 0.0, 1.0)}  # image mixup (probability)
 
+        with open(opt.hyp) as f:
+            hyp = yaml.safe_load(f)  # load hyps dict
         assert opt.local_rank == -1, 'DDP mode not implemented for --evolve'
         opt.notest, opt.nosave = True, True  # only test/save final epoch
         # ei = [isinstance(x, (int, float)) for x in hyp.values()]  # evolvable indices
