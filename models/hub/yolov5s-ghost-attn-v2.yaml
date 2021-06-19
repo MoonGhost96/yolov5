@@ -13,13 +13,13 @@ anchors:
 backbone:
   # [from, number, module, args]
   [[-1, 1, Focus, [32, 3]],  # 0-P1/2
-   [-1, 1, Conv, [64, 3, 2]],  # 1-P2/4
+   [-1, 1, GhostBottleneck, [64, 3, 2]],  # 1-P2/4
    [-1, 1, GhostC3, [64, True]],
-   [-1, 1, Conv, [128, 3, 2]],  # 3-P3/8
+   [-1, 1, GhostBottleneck, [128, 3, 2]],  # 3-P3/8
    [-1, 3, GhostC3, [128, True]],
-   [-1, 1, Conv, [256, 3, 2]],  # 5-P4/16
+   [-1, 1, GhostBottleneck, [256, 3, 2]],  # 5-P4/16
    [-1, 3, GhostC3, [256, True]],
-   [-1, 1, Conv, [512, 3, 2]],  # 7-P5/32
+   [-1, 1, GhostBottleneck, [512, 3, 2]],  # 7-P5/32
    [-1, 1, SPP, [512, [5, 9, 13]]],
    [-1, 1, GhostC3, [512, True]],  # 9 (large)
   ]
