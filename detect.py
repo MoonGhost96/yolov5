@@ -8,8 +8,8 @@ import torch.backends.cudnn as cudnn
 
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
-from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, apply_classifier, \
-    scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box
+from utils.general import check_img_size, check_requirements, check_imshow, colorstr, non_max_suppression, \
+    apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
@@ -172,7 +172,7 @@ def detect(weights='yolov5s.pt',  # model.pt path(s)
     print(f'Done. ({time.time() - t0:.3f}s)')
 
 
-if __name__ == '__main__':
+def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
@@ -198,7 +198,15 @@ if __name__ == '__main__':
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     opt = parser.parse_args()
-    print(opt)
-    check_requirements(exclude=('tensorboard', 'thop'))
+    return opt
 
+
+def main(opt):
+    print(colorstr('detect: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
+    check_requirements(exclude=('tensorboard', 'thop'))
     detect(**vars(opt))
+
+
+if __name__ == "__main__":
+    opt = parse_opt()
+    main(opt)
