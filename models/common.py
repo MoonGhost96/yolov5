@@ -562,6 +562,7 @@ class CoordAtt(nn.Module):
 
         return y
 
+
 class InvertedResidual(nn.Module):
     def __init__(self, inp, oup, hidden_dim, kernel_size, stride, use_se, use_hs):
         super(InvertedResidual, self).__init__()
