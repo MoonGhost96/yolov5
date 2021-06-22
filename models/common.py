@@ -80,6 +80,24 @@ class SpatialAttention(nn.Module):
         return x * self.sigmoid(y)
 
 
+class SpatialAttentionV2(nn.Module):
+    def __init__(self,c , kernel_size=7):
+        super(SpatialAttentionV2, self).__init__()
+        self.conv0 = Conv(c, 1, 3, 1, 1)
+        self.conv1 = Conv(c, 1, 1, 1)
+        self.conv2 = nn.Conv2d(4, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        conv0_out = self.conv0(x)
+        conv1_out = self.conv1(x)
+        y = torch.cat([avg_out, max_out, conv1_out, conv0_out], dim=1)
+        y = self.conv2(y)
+        return x * self.sigmoid(y)
+
+
 class LCS(nn.Module):
     def __init__(self, channel):
         super(LCS, self).__init__()
@@ -196,7 +214,8 @@ class C3(nn.Module):
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.attn = nn.Sequential(SpatialAttention(), eca_layer(c_)) if attn else nn.Identity()
+        # self.attn = nn.Sequential(SpatialAttention(), eca_layer(c_)) if attn else nn.Identity()
+        self.attn = nn.Sequential(SpatialAttentionV2(c_), eca_layer(c_)) if attn else nn.Identity()
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
