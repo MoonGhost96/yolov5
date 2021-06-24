@@ -15,6 +15,7 @@ from itertools import repeat
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from subprocess import check_output
+from fast_pytorch_kmeans import KMeans
 
 import cv2
 import numpy as np
@@ -612,6 +613,29 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
             print(f'WARNING: NMS time limit {time_limit}s exceeded')
             break  # time limit exceeded
 
+    return output
+
+
+def area_kmeans(prediction,n_num):
+    output = []
+    for xi, p in enumerate(prediction):
+        if prediction[xi].shape[0] < n_num:
+            output.append(prediction[xi])
+            continue
+        class_num = min(n_num,p.shape[0])
+        model = KMeans(n_clusters=class_num, mode='euclidean', verbose=1)
+        labels = model.fit_predict(p[:, 0:2])
+        new_p = torch.zeros((class_num, 6), device=prediction[xi].device)
+        for i in range(0, class_num):
+            index = torch.eq(labels, i)
+            cur_class_p = p[index]
+            Min,_ = torch.min(cur_class_p,0)
+            Max,_ = torch.max(cur_class_p,0)
+            left,top = Min[0],Min[1]
+            right,bottom = Max[2],Max[3]
+            new_box = torch.tensor([left,top,right,bottom,1.0,0.0])
+            new_p[i] = new_box
+        output.append(new_p)
     return output
 
 
