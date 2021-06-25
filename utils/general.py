@@ -622,10 +622,12 @@ def area_kmeans(prediction,n_num):
         if prediction[xi].shape[0] < n_num:
             output.append(prediction[xi])
             continue
+        p = xyxy2xywh(p)
         class_num = min(n_num,p.shape[0])
         model = KMeans(n_clusters=class_num, mode='euclidean', verbose=1)
         labels = model.fit_predict(p[:, 0:2])
         new_p = torch.zeros((class_num, 6), device=prediction[xi].device)
+        p = xywh2xyxy(p)
         for i in range(0, class_num):
             index = torch.eq(labels, i)
             cur_class_p = p[index]
