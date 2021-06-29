@@ -1,7 +1,7 @@
 """Run inference with a YOLOv5 model on images, videos, directories, streams
 
 Usage:
-    $ python path/to/detect.py --source path/to/img.jpg --weights yolov5s.pt --img 640
+    $ python path/to/dae_detect.py --source path/to/img.jpg --weights yolov5s.pt --img 640
 """
 
 import argparse
@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 
@@ -17,11 +18,40 @@ FILE = Path(__file__).absolute()
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
 
 from models.experimental import attempt_load
-from utils.datasets import LoadStreams, LoadImages
+from utils.datasets import LoadStreams, LoadImages, letterbox
 from utils.general import check_img_size, check_requirements, check_imshow, colorstr, non_max_suppression, \
-    apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box
+    apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box, area_kmeans, \
+    xywh2xyxy, my_nsm
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
+
+
+@torch.no_grad()
+def two_detect(im0, model, shape):
+    img = letterbox(im0, new_shape=640)[0]
+    img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+    img = np.ascontiguousarray(img)
+    img = torch.from_numpy(img).cuda()
+    img = img.float()
+    img /= 255.0  # 0 - 255 to 0.0 - 1.0
+    if img.ndimension() == 3:
+        img = img.unsqueeze(0)
+    #xywh
+    pred = model(img, augment=False)[0]  # crop letterbox
+    #xyxy
+    pred = non_max_suppression(pred, 0.45, 0.25)
+    all_det = []
+    for i, det in enumerate(pred):
+        det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+        for xyxy in det:
+            tmp_det = [0] * 6
+            tmp_det[0], tmp_det[1], tmp_det[2], tmp_det[3]= xyxy[0] + shape[0], xyxy[1] + shape[1], xyxy[2] + shape[0], xyxy[3] + shape[1]
+            xyxy[0], xyxy[1], xyxy[2], xyxy[3] = tmp_det[0], tmp_det[1], tmp_det[2], tmp_det[3]
+            all_det.append(xyxy)
+    if len(all_det) == 0:
+        return None
+    out = torch.stack(all_det)
+    return out
 
 
 @torch.no_grad()
@@ -48,6 +78,8 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         hide_labels=False,  # hide labels
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
+        dae_weights='yolov5s.pt',
+        daeiou_thres=0.4,
         ):
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -70,6 +102,11 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     if half:
         model.half()  # to FP16
 
+    # Load dae model
+    dae_model = attempt_load(dae_weights, map_location=device)  # load FP32 model
+    if half:
+        dae_model.half()  # to FP16
+
     # Second-stage classifier
     classify = False
     if classify:
@@ -89,7 +126,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     if device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
     t0 = time.time()
-    for path, img, im0s, vid_cap in dataset:
+    for path, img, im0s, vid_cap in dataset:  # img 640 im0s origin
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -98,12 +135,42 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
 
         # Inference
         t1 = time_synchronized()
+
+        # detector inference
         pred = model(img, augment=augment)[0]
+        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+
+        # dea inference
+        # xywh
+        dae_pred = dae_model(img, augment=augment)[0]
+        # xyxy
+        dae_pred = non_max_suppression(dae_pred, conf_thres, daeiou_thres, max_det=max_det)
+        new_pred = None
+        dae_pred = area_kmeans(dae_pred, 4)
+        for i, dae_det in enumerate(dae_pred):
+            if dae_det is not None and len(dae_det):
+                dae_det[:, :4] = scale_coords(img.shape[2:], dae_det[:, :4], im0s.shape).round()
+                new_pred_list = []
+                for cp_xyxy in dae_det:
+                    crop_img = im0s[int(cp_xyxy[1]):int(cp_xyxy[3]), int(cp_xyxy[0]):int(cp_xyxy[2])]
+                    new_det = two_detect(crop_img, model, shape=[cp_xyxy[0], cp_xyxy[1]])
+                    if new_det is not None:
+                        new_pred_list.append(new_det)
+                        cv2.rectangle(im0s, (int(cp_xyxy[0]), int(cp_xyxy[1])), (int(cp_xyxy[2]), int(cp_xyxy[3])), (0, 0, 255))
+                new_pred = torch.cat(new_pred_list).unsqueeze(0) if len(new_pred_list) else None
+
 
         # Apply NMS
-        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-        t2 = time_synchronized()
+        if len(pred[0]):
+            pred[0][:, :4] = scale_coords(img.shape[2:], pred[0][:, :4], im0s.shape).round()
+        if new_pred is not None:
+            new_pred = new_pred.squeeze(0)
+            pred[0] = torch.cat([pred[0],new_pred],dim=0)
+            pred = pred[0].unsqueeze(0)
+            pred = my_nsm(pred, 0.25, 0.45)
 
+
+        t2 = time_synchronized()
         # Apply Classifier
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
@@ -123,7 +190,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             imc = im0.copy() if save_crop else im0  # for save_crop
             if len(det):
                 # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+                # det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
                 # Print results
                 for c in det[:, -1].unique():
@@ -184,7 +251,8 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default='yolov5s-attn-vis.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', nargs='+', type=str, default='yolov5s-ghostv2-VisDrone.pt',
+                        help='model.pt path(s)')
     parser.add_argument('--source', type=str, default='data/images', help='file/dir/URL/glob, 0 for webcam')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
@@ -207,6 +275,8 @@ def parse_opt():
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
+    parser.add_argument('--dae_weights', type=str, default='dae.pt', help='dae weights')
+    parser.add_argument('--daeiou-thres', type=float, default=0.45, help='DAE NMS IoU threshold')
     opt = parser.parse_args()
     return opt
 
