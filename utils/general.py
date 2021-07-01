@@ -720,6 +720,22 @@ def area_kmeans(prediction,n_num):
         output.append(new_p)
     return output
 
+def to_square(prediction, W, H): # xyxy
+    for pred in prediction:
+        for det in pred: #xyxy
+            w = det[2] - det[0]
+            h = det[3] - det[1]
+            if w > h:
+                d = w - h
+                det[1] = max(det[1] - d / 2,0)
+                det[3] = min(det[3] + d / 2,H)
+            else:
+                d = h - w
+                det[0] = max(det[0] - d / 2,0)
+                det[2] = min(det[2] + d / 2,W)
+    return prediction
+
+
 
 def strip_optimizer(f='best.pt', s=''):  # from utils.general import *; strip_optimizer()
     # Strip optimizer from 'f' to finalize training, optionally save as 's'
