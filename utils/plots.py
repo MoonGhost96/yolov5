@@ -306,6 +306,8 @@ def plot_labels(labels, names=(), save_dir=Path(''), loggers=None):
         ax[0].set_xticklabels(names, rotation=90, fontsize=10)
     else:
         ax[0].set_xlabel('classes')
+    ax[3].set_xlim(0, 1)
+    ax[3].set_ylim(0, 1)
     sn.histplot(x, x='x', y='y', ax=ax[2], bins=50, pmax=0.9)
     sn.histplot(x, x='width', y='height', ax=ax[3], bins=50, pmax=0.9)
 
