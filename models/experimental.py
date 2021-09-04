@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from models.common import Conv, DWConv, eca_layer, SpatialAttention
+from models.common import Conv, DWConv, eca_layer, SpatialAttention, channel_shuffle
 from utils.google_utils import attempt_download
 
 
@@ -88,7 +88,7 @@ class GhostC3(nn.Module):
         y2 = self.cv2(x)
         y1 = self.attn(y1)
         out = self.cv3(torch.cat((y1, y2), dim=1))
-        return out
+        return channel_shuffle(out, 2)
 
 
 class MixConv2d(nn.Module):
