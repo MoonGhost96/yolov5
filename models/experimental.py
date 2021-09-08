@@ -88,7 +88,7 @@ class GhostC3(nn.Module):
         y2 = self.cv2(x)
         y1 = self.attn(y1)
         out = self.cv3(torch.cat((y1, y2), dim=1))
-        return channel_shuffle(out, 2)
+        return out
 
 
 class MixConv2d(nn.Module):
