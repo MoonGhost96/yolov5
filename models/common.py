@@ -247,8 +247,8 @@ class C3SPP(C3):
 
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
-    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
-        super().__init__(c1, c2, n, shortcut, False, g, e)
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, attn, g, e)
         c_ = int(c2 * e)  # hidden channels
         self.m = nn.Sequential(*[GhostBottleneck(c_, c_) for _ in range(n)])
 
@@ -363,6 +363,15 @@ class Concat(nn.Module):
 
     def forward(self, x):
         return torch.cat(x, self.d)
+
+
+class Fusion(nn.Module):
+    def __init__(self, act=True):
+        super().__init__()
+        self.act = nn.SiLU() if act else nn.Identity()
+
+    def forward(self, x):
+        return self.act(x[0] + x[1])
 
 
 class AutoShape(nn.Module):
