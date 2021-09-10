@@ -366,12 +366,13 @@ class Concat(nn.Module):
 
 
 class Fusion(nn.Module):
-    def __init__(self, act=True):
+    def __init__(self):
         super().__init__()
-        self.act = nn.SiLU() if act else nn.Identity()
 
     def forward(self, x):
-        return self.act(x[0] + x[1])
+        y = x[0]
+        y = y + x[1]
+        return y
 
 
 class AutoShape(nn.Module):
