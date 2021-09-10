@@ -37,13 +37,12 @@ head:
    [-1, 1, C3Ghost, [128, False]],  # 17 (P3/8-small)
 
    [-1, 1, nn.MaxPool2d, [3,2,1]], #18 //下采样
-   [ 6, 1, GhostConv, [ 128,1,1 ] ], #19
-   [[-1, 18, 14], 1, Sum, [3,True]],  # cat head P4
-   [-1, 1, C3Ghost, [256, False]],  # 21 (P4/16-medium)
+   [[-1, 14], 1, Concat, [1]],  # cat head P4
+   [-1, 1, C3Ghost, [256, False]],  # 20 (P4/16-medium)
 
-   [ -1, 1, nn.MaxPool2d, [3,2,1] ], #22 //下采样
-   [ [ -1, 10 ], 1, Sum, [2, True] ],  # cat head P5
-   [ -1, 1, C3Ghost, [ 512, False ] ],  # 24 (P5/32-large)
+   [ -1, 1, nn.MaxPool2d, [3,2,1] ], #21 //下采样
+   [ [ -1, 10 ], 1, Concat, [1] ],  # cat head P5
+   [ -1, 1, C3Ghost, [ 512, False ] ],  # 23 (P5/32-large)
 
-   [[17, 21, 24], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
+   [[17, 20, 23], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
   ]
