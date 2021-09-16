@@ -1,4 +1,5 @@
 # parameters
+# voc 77.5 52.9
 nc: 80  # number of classes
 depth_multiple: 1.0  # model depth multiple
 width_multiple: 1.0  # layer channel multiple
