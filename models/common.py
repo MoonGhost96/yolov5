@@ -314,20 +314,18 @@ class GhostConv(nn.Module):
 
 class GhostBottleneck(nn.Module):
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
-    def __init__(self, c1, c2, k=3, s=1, exp=0.5, shortcut=True):  # ch_in, ch_out, kernel, stride
+    def __init__(self, c1, c2, k=3, s=1, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
         c_ = int(c2 * exp)
         self.conv = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
                                   DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
                                   GhostConv(c_, c2, 1, 1, act=False))  # pw-linear
-        self.add = shortcut
-        if self.add:
-            self.shortcut = nn.Sequential(DWConv(c1, c1, k, s, act=False),
-                                          Conv(c1, c2, 1, 1, act=False)) if s == 2 else nn.Identity()
+
+        self.shortcut = nn.Sequential(DWConv(c1, c1, k, s, act=False),
+                                      Conv(c1, c2, 1, 1, act=False)) if s == 2 else nn.Identity()
 
     def forward(self, x):
-        y = self.conv(x)
-        return y + self.shortcut(x) if self.add else y
+        return self.conv(x) + self.shortcut(x)
 
 
 class Contract(nn.Module):
