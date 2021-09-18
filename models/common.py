@@ -287,6 +287,24 @@ class SPPF(nn.Module):
             return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1))
 
 
+class GhostSPPF(nn.Module):
+    # Ghost Fast Spatial Pyramid Pooling
+    def __init__(self, c1, c2, k=5):  # equivalent to SPP(k=(5, 9, 13))
+        super().__init__()
+        c_ = c1 // 2  # hidden channels
+        self.cv1 = GhostConv(c1, c_, 1, 1)  # 降维
+        self.cv2 = GhostConv(c_ * 4, c2, 1, 1)  # 降维
+        self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
+
+    def forward(self, x):
+        x = self.cv1(x)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')  # suppress torch 1.9.0 max_pool2d() warning
+            y1 = self.m(x)
+            y2 = self.m(y1)
+            return self.cv2(torch.cat([x, y1, y2, self.m(y2)], 1))
+
+
 class Focus(nn.Module):
     # Focus wh information into c-space
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
