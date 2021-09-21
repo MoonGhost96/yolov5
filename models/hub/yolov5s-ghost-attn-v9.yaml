@@ -3,7 +3,7 @@
 nc: 80  # number of classes
 depth_multiple: 1.0  # model depth multiple
 width_multiple: 1.0  # layer channel multiple
-
+# batch 68 ~ 70
 # anchors
 anchors:
   - [10,13, 16,30, 33,23]  # P3/8
