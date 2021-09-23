@@ -37,7 +37,6 @@ def autopad(k, p=None):  # kernel, padding
 class SoftPool2d(torch.nn.Module):
     def __init__(self, kernel_size=2, stride=None, force_inplace=False):
         super(SoftPool2d, self).__init__()
-        print(kernel_size,stride)
         self.kernel_size = kernel_size
         self.stride = stride
         self.force_inplace = force_inplace
