@@ -18,7 +18,7 @@ train: # train images (relative to 'path') 3422 images
   - images/inrae_1
   - images/usask_1
 val: # val images (relative to 'path') 748 images (WARNING: train set contains ethz_1)
-  - images/ethz_1
+  - images/val
 test: # test images (optional) 1276 images
   - images/utokyo_1
   - images/utokyo_2
