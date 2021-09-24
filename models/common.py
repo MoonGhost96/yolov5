@@ -22,7 +22,6 @@ from utils.general import colorstr, increment_path, is_ascii, make_divisible, no
     scale_coords, xyxy2xywh
 from utils.plots import Annotator, colors
 from utils.torch_utils import time_sync
-from SoftPool import soft_pool2d
 LOGGER = logging.getLogger(__name__)
 
 
@@ -32,17 +31,6 @@ def autopad(k, p=None):  # kernel, padding
     if p is None:
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
-
-
-class SoftPool2d(torch.nn.Module):
-    def __init__(self, kernel_size=2, stride=None, force_inplace=False):
-        super(SoftPool2d, self).__init__()
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.force_inplace = force_inplace
-
-    def forward(self, x):
-        return soft_pool2d(x, kernel_size=self.kernel_size, stride=self.stride, force_inplace=self.force_inplace)
 
 
 class eca_layer(nn.Module):
