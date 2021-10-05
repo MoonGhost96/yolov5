@@ -1,5 +1,5 @@
 # parameters
-nc: 2  # number of classes
+nc: 80  # number of classes
 depth_multiple: 1.0  # dont change this otherwise InvertedResidual will be affected
 width_multiple: 1.0  # dont change this otherwise InvertedResidual will be affected
 
