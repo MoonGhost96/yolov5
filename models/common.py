@@ -349,6 +349,20 @@ class GhostBottleneck(nn.Module):
         return self.conv(x) + self.shortcut(x)
 
 
+class GhostBottleneck_v2(nn.Module):
+    def __init__(self, c1, c2, exp=0.5):  # ch_in, ch_out, kernel, stride
+        super().__init__()
+        c_ = int(c2 * exp)
+        self.cv1 = nn.Sequential(GhostConv(c1, c_, 3, 2),  # pw
+                                  GhostConv(c_, c1, 1, 1, act=False))  # pw-linear
+
+        self.shortcut = DWConv(c1, c1, 3, 2, act=False)
+        self.cv2 = Conv(2*c1, c2, 1, 1)
+
+    def forward(self, x):
+        return self.cv2(torch.cat((self.cv1(x), self.shortcut(x)), 1))
+
+
 class Contract(nn.Module):
     # Contract width-height into channels, i.e. x(1,64,80,80) to x(1,256,40,40)
     def __init__(self, gain=2):
