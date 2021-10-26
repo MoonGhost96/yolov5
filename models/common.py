@@ -250,10 +250,10 @@ class C3SPP(C3):
 
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, g=1, e=0.5):
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, gb_exp=0.5, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, attn, g, e)
         c_ = int(c2 * e)  # hidden channels
-        self.m = nn.Sequential(*[GhostBottleneck(c_, c_) for _ in range(n)])
+        self.m = nn.Sequential(*[GhostBottleneck(c_, c_, exp=gb_exp) for _ in range(n)])
 
 
 class SPP(nn.Module):
@@ -337,7 +337,13 @@ class GhostBottleneck(nn.Module):
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
     def __init__(self, c1, c2, k=3, s=1, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
+        if exp == -1:
+            gamma = 7.16
+            b = -2.42
+            exp = gamma / (math.log(c2, 2) + b)
+            exp = round(exp / 0.1) * 0.1
         c_ = int(c2 * exp)
+        c_ = c_ + 1 if c_ & 1 else c_
         self.conv = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
                                   DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
                                   GhostConv(c_, c2, 1, 1, act=False))  # pw-linear
