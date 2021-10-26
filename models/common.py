@@ -357,7 +357,7 @@ class GhostBottleneck_v2(nn.Module):
                                   GhostConv(c_, c1, 1, 1, act=False))  # pw-linear
 
         self.shortcut = DWConv(c1, c1, 3, 2, act=False)
-        self.cv2 = Conv(2*c1, c2, 1, 1)
+        self.cv2 = Conv(2*c1, c2, 1, 1, act=False)
 
     def forward(self, x):
         return self.cv2(torch.cat((self.cv1(x), self.shortcut(x)), 1))
