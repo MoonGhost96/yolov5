@@ -8,11 +8,13 @@ def solve_gb(max_c=768, min_c=32, max_exp=1.6, min_exp=1.1):
     g = Symbol('g')
     b = Symbol('b')
     sol = solve([min_exp * (math.log(max_c, 2) + b) - g, max_exp * (math.log(min_c, 2) + b) - g], [g, b])
+    # sol = solve([math.log(max_c,2)-b+min_exp*g, math.log(min_c,2)-b+max_exp*g], [g,b])
     return sol[g], sol[b]
 
 
 def get_exp(g, b, c):
     exp = g / (math.log(c, 2) + b)
+    # exp = -1*(math.log(c,2)-b)/g
     return exp
 
 
