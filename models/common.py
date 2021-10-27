@@ -50,7 +50,7 @@ class eca_layer(nn.Module):
             k_size = t if t % 2 else t + 1
             # print("k_size",k_size)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=k_size-1, bias=False, dilation=2)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
