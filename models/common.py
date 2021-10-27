@@ -338,10 +338,10 @@ class GhostBottleneck(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
         if exp == -1:
-            gamma = 7.16
-            b = -2.42
+            gamma = 12.96
+            b = 1.2
             exp = gamma / (math.log(c2, 2) + b)
-            exp = round(exp / 0.1) * 0.1
+            exp = round(exp / 0.01) * 0.01
         c_ = int(c2 * exp)
         c_ = c_ + 1 if c_ & 1 else c_
         self.conv = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
@@ -353,20 +353,6 @@ class GhostBottleneck(nn.Module):
 
     def forward(self, x):
         return self.conv(x) + self.shortcut(x)
-
-
-class GhostBottleneck_v2(nn.Module):
-    def __init__(self, c1, c2, exp=0.5):  # ch_in, ch_out, kernel, stride
-        super().__init__()
-        c_ = int(c2 * exp)
-        self.cv1 = nn.Sequential(GhostConv(c1, c_, 3, 2),  # pw
-                                  GhostConv(c_, c1, 1, 1, act=False))  # pw-linear
-
-        self.shortcut = DWConv(c1, c1, 3, 2, act=False)
-        self.cv2 = Conv(2*c1, c2, 1, 1, act=False)
-
-    def forward(self, x):
-        return self.cv2(torch.cat((self.cv1(x), self.shortcut(x)), 1))
 
 
 class Contract(nn.Module):
