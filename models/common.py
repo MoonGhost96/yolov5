@@ -21,6 +21,7 @@ from torch.cuda import amp
 from utils.datasets import exif_transpose, letterbox
 from utils.general import colorstr, increment_path, is_ascii, make_divisible, non_max_suppression, save_one_box, \
     scale_coords, xyxy2xywh
+from utils.parameters import get_exp, solve_gb
 from utils.plots import Annotator, colors
 from utils.torch_utils import time_sync
 LOGGER = logging.getLogger(__name__)
@@ -337,11 +338,11 @@ class GhostBottleneck(nn.Module):
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
     def __init__(self, c1, c2, k=3, s=1, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
+        # adaptive exp
         if exp == -1:
-            gamma = 12.96
-            b = 1.2
-            exp = gamma / (math.log(c2, 2) + b)
-            exp = round(exp / 0.01) * 0.01
+            g, b = solve_gb()
+            exp = get_exp(g, b, c2)
+
         c_ = int(c2 * exp)
         c_ = c_ + 1 if c_ & 1 else c_
         self.conv = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
