@@ -81,6 +81,7 @@ class deca_layer(nn.Module):
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv1 = nn.Conv1d(1, 1, kernel_size=3, padding=1, bias=False)
         self.conv2 = nn.Conv1d(1, 1, kernel_size=3, padding=2, bias=False, dilation=2)
+        self.act = nn.SiLU()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -89,7 +90,7 @@ class deca_layer(nn.Module):
         y = self.avg_pool(x)
 
         # Two different branches of ECA module
-        y = self.conv1(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+        y = self.act(self.conv1(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1))
         y = self.conv2(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
 
         # Multi-scale information fusion
