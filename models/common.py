@@ -114,6 +114,23 @@ class SpatialAttention(nn.Module):
         return x * self.sigmoid(y)
 
 
+class DilateSpatialAttention(nn.Module):
+    def __init__(self):
+        super(DilateSpatialAttention, self).__init__()
+
+        self.conv1 = nn.Conv2d(2, 2, 3, padding=1, bias=False)
+        self.act = nn.SiLU()
+        self.conv2 = nn.Conv2d(2, 1, 3, padding=2, bias=False, dilation=2)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        y = torch.cat([avg_out, max_out], dim=1)
+        y = self.conv2(self.act(self.conv1(y)))
+        return x * self.sigmoid(y)
+
+
 # Pelee: A Real-Time Object Detection System onMobileDevices
 class StemBlock(nn.Module):
     def __init__(self, c1, c2, k=3, s=2, p=None, g=1, act=True):
@@ -225,7 +242,7 @@ class BottleneckCSP(nn.Module):
 
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, use_deca=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, use_deca=False, use_dsa=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
@@ -233,7 +250,7 @@ class C3(nn.Module):
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.attn = nn.Sequential(SpatialAttention(), deca_layer() if use_deca else eca_layer(c_)) if attn else nn.Identity()
+        self.attn = nn.Sequential(DilateSpatialAttention() if use_dsa else SpatialAttention(), deca_layer() if use_deca else eca_layer(c_)) if attn else nn.Identity()
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
@@ -281,8 +298,8 @@ class C3SPP(C3):
 
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, use_deca=False, gb_exp=0.5, g=1, e=0.5):
-        super().__init__(c1, c2, n, shortcut, attn, use_deca, g, e)
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, use_deca=False, use_dsa=False, gb_exp=0.5, g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, attn, use_deca, use_dsa, g, e)
         c_ = int(c2 * e)  # hidden channels
         self.m = nn.Sequential(*[GhostBottleneck(c_, c_, exp=gb_exp) for _ in range(n)])
 
