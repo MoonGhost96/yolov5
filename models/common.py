@@ -99,6 +99,29 @@ class deca_layer(nn.Module):
         return x * y.expand_as(x)
 
 
+class wca_layer(nn.Module):
+
+    def __init__(self, layers=4):
+        super(wca_layer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        dilation_rates = [2**(k-1) for k in range(1, layers+1)]
+        self.m = nn.Sequential(*[CircularConv1d(1, 1, 3, 1, d, d,
+                                                True if d != dilation_rates[-1] else False) for d in dilation_rates])
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        y = self.avg_pool(x)
+
+        y = y.squeeze(-1).transpose(-1, -2)
+        y = self.m(y)
+        y = y.transpose(-1, -2).unsqueeze(-1)
+
+        y = self.sigmoid(y)
+
+        return x * y.expand_as(x)
+
+
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
@@ -145,6 +168,16 @@ class Conv(nn.Module):
         return self.act(self.bn(self.conv(x)))
 
     def forward_fuse(self, x):
+        return self.act(self.conv(x))
+
+
+class CircularConv1d(nn.Module):
+    def __init__(self, c1, c2, k=1, s=1, p=0, d=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+        super().__init__()
+        self.conv = nn.Conv1d(c1, c2, kernel_size=k, stride=s, padding=p, bias=False, dilation=d, padding_mode='circular')
+        self.act = nn.SiLU() if act else nn.Identity()
+
+    def forward(self, x):
         return self.act(self.conv(x))
 
 
@@ -823,3 +856,34 @@ class ShuffleNetV2_InvertedResidual(nn.Module):
         out = channel_shuffle(out, 2)
 
         return out
+
+
+class NonLocalBlock(nn.Module):
+    def __init__(self, channel):
+        super(NonLocalBlock, self).__init__()
+        self.inter_channel = channel // 2
+        self.conv_phi = nn.Conv2d(in_channels=channel, out_channels=self.inter_channel, kernel_size=1, stride=1,padding=0, bias=False)
+        self.conv_theta = nn.Conv2d(in_channels=channel, out_channels=self.inter_channel, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv_g = nn.Conv2d(in_channels=channel, out_channels=self.inter_channel, kernel_size=1, stride=1, padding=0, bias=False)
+        self.softmax = nn.Softmax(dim=1)
+        self.conv_mask = nn.Conv2d(in_channels=self.inter_channel, out_channels=channel, kernel_size=1, stride=1, padding=0, bias=False)
+
+    def forward(self, x):
+        # [N, C, H , W]
+        b, c, h, w = x.size()
+        # [N, C/2, H * W]
+        x_phi = self.conv_phi(x).view(b, c, -1)
+        # [N, H * W, C/2]
+        x_theta = self.conv_theta(x).view(b, c, -1).permute(0, 2, 1).contiguous()
+        x_g = self.conv_g(x).view(b, c, -1).permute(0, 2, 1).contiguous()
+        # [N, H * W, H * W]
+        mul_theta_phi = torch.matmul(x_theta, x_phi)
+        mul_theta_phi = self.softmax(mul_theta_phi)
+        # [N, H * W, C/2]
+        mul_theta_phi_g = torch.matmul(mul_theta_phi, x_g)
+        # [N, C/2, H, W]
+        mul_theta_phi_g = mul_theta_phi_g.permute(0,2,1).contiguous().view(b,self.inter_channel, h, w)
+        # [N, C, H , W]
+        mask = self.conv_mask(mul_theta_phi_g)
+        output = mask + x
+        return output
