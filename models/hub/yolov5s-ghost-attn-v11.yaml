@@ -15,14 +15,14 @@ backbone:
   # [from, number, module, args]
   [[-1, 1, Focus, [32, 3]],  # 0-P1/2
    [-1, 1, GhostBottleneck, [64, 3, 2, 1.5]],  # 1-P2/4
-   [-1, 1, C3Ghost, [64, True, True, 'deca']],
+   [-1, 1, C3Ghost, [64, True, True, 'wca']],
    [-1, 1, GhostBottleneck, [128, 3, 2, 1.5]],  # 3-P3/8
-   [-1, 3, C3Ghost, [128, True, True, 'deca']],
+   [-1, 3, C3Ghost, [128, True, True, 'wca']],
    [-1, 1, GhostBottleneck, [256, 3, 2, 1.5]],  # 5-P4/16
-   [-1, 3, C3Ghost, [256, True, True, 'deca']],
+   [-1, 3, C3Ghost, [256, True, True, 'wca']],
    [-1, 1, GhostBottleneck, [512, 3, 2, 1]],  # 7-P5/32
    [-1, 1, GhostSPPF, [512]],
-   [-1, 1, C3Ghost, [512, False, True, 'deca']],  # 9 (large)
+   [-1, 1, C3Ghost, [512, False, True, 'wca']],  # 9 (large)
   ]
 
 # YOLOv5 head
