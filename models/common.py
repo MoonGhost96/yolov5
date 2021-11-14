@@ -99,6 +99,29 @@ class deca_layer(nn.Module):
         return x * y.expand_as(x)
 
 
+class wca_layer(nn.Module):
+
+    def __init__(self, layers=4):
+        super(wca_layer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        dilation_rates = [2**(k-1) for k in range(1, layers+1)]
+        self.m = nn.Sequential(*[CircularConv1d(1, 1, 3, 1, d, d,
+                                                True if d != dilation_rates[-1] else False) for d in dilation_rates])
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        y = self.avg_pool(x)
+
+        y = y.squeeze(-1).transpose(-1, -2)
+        y = self.m(y)
+        y = y.transpose(-1, -2).unsqueeze(-1)
+
+        y = self.sigmoid(y)
+
+        return x * y.expand_as(x)
+
+
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
@@ -145,6 +168,16 @@ class Conv(nn.Module):
         return self.act(self.bn(self.conv(x)))
 
     def forward_fuse(self, x):
+        return self.act(self.conv(x))
+
+
+class CircularConv1d(nn.Module):
+    def __init__(self, c1, c2, k=1, s=1, p=0, d=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+        super().__init__()
+        self.conv = nn.Conv1d(c1, c2, kernel_size=k, stride=s, padding=p, bias=False, dilation=d, padding_mode='circular')
+        self.act = nn.SiLU() if act else nn.Identity()
+
+    def forward(self, x):
         return self.act(self.conv(x))
 
 
@@ -225,15 +258,20 @@ class BottleneckCSP(nn.Module):
 
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, use_deca=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
         super().__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c1, c_, 1, 1)
         self.cv3 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
+        channel_module_switch = {
+            'eca': eca_layer(c_),
+            'deca': deca_layer(),
+            'wca': wca_layer(),
+        }
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.attn = nn.Sequential(SpatialAttention(), deca_layer() if use_deca else eca_layer(c_)) if attn else nn.Identity()
+        self.attn = nn.Sequential(SpatialAttention(), channel_module_switch[channel_module]) if attn else nn.Identity()
 
     def forward(self, x):
         y1 = self.m(self.cv1(x))
@@ -281,8 +319,8 @@ class C3SPP(C3):
 
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, use_deca=False, gb_exp=0.5, g=1, e=0.5):
-        super().__init__(c1, c2, n, shortcut, attn, use_deca, g, e)
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', gb_exp=0.5, g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, attn, channel_module, g, e)
         c_ = int(c2 * e)  # hidden channels
         self.m = nn.Sequential(*[GhostBottleneck(c_, c_, exp=gb_exp) for _ in range(n)])
 
@@ -823,3 +861,34 @@ class ShuffleNetV2_InvertedResidual(nn.Module):
         out = channel_shuffle(out, 2)
 
         return out
+
+
+class NonLocalBlock(nn.Module):
+    def __init__(self, channel):
+        super(NonLocalBlock, self).__init__()
+        self.inter_channel = channel // 2
+        self.conv_phi = nn.Conv2d(in_channels=channel, out_channels=self.inter_channel, kernel_size=1, stride=1,padding=0, bias=False)
+        self.conv_theta = nn.Conv2d(in_channels=channel, out_channels=self.inter_channel, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv_g = nn.Conv2d(in_channels=channel, out_channels=self.inter_channel, kernel_size=1, stride=1, padding=0, bias=False)
+        self.softmax = nn.Softmax(dim=1)
+        self.conv_mask = nn.Conv2d(in_channels=self.inter_channel, out_channels=channel, kernel_size=1, stride=1, padding=0, bias=False)
+
+    def forward(self, x):
+        # [N, C, H , W]
+        b, c, h, w = x.size()
+        # [N, C/2, H * W]
+        x_phi = self.conv_phi(x).view(b, c, -1)
+        # [N, H * W, C/2]
+        x_theta = self.conv_theta(x).view(b, c, -1).permute(0, 2, 1).contiguous()
+        x_g = self.conv_g(x).view(b, c, -1).permute(0, 2, 1).contiguous()
+        # [N, H * W, H * W]
+        mul_theta_phi = torch.matmul(x_theta, x_phi)
+        mul_theta_phi = self.softmax(mul_theta_phi)
+        # [N, H * W, C/2]
+        mul_theta_phi_g = torch.matmul(mul_theta_phi, x_g)
+        # [N, C/2, H, W]
+        mul_theta_phi_g = mul_theta_phi_g.permute(0,2,1).contiguous().view(b,self.inter_channel, h, w)
+        # [N, C, H , W]
+        mask = self.conv_mask(mul_theta_phi_g)
+        output = mask + x
+        return output
