@@ -101,7 +101,7 @@ class deca_layer(nn.Module):
 
 class wca_layer(nn.Module):
 
-    def __init__(self, layers=4):
+    def __init__(self, layers=2):
         super(wca_layer, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         dilation_rates = [2**(k-1) for k in range(1, layers+1)]
