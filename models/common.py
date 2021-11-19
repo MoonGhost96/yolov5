@@ -137,6 +137,25 @@ class SpatialAttention(nn.Module):
         return x * self.sigmoid(y)
 
 
+class DilatedSpatialAttention(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.conv1 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False), nn.SiLU())
+        self.conv2 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=2, dilation=2, bias=False), nn.SiLU())
+        self.conv3 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=4, dilation=4, bias=False), nn.SiLU())
+        self.cv = nn.Conv2d(2, 1, kernel_size=1, stride=1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        y = torch.cat([avg_out, max_out], dim=1)
+        y = self.cv(self.conv3(self.conv2(self.conv1(y))))
+        out = x*self.sigmoid(y)
+        return out
+
+
 # Pelee: A Real-Time Object Detection System onMobileDevices
 class StemBlock(nn.Module):
     def __init__(self, c1, c2, k=3, s=2, p=None, g=1, act=True):
@@ -269,12 +288,11 @@ class C3(nn.Module):
             'eca': eca_layer(c_),
             'deca': deca_layer(),
             'wca': wca_layer(),
-            '': nn.Identity()
+            'identity': nn.Identity(),
         }
         spatial_module_switch = {
             'sa': SpatialAttention(),
-            '': nn.Identity()
-
+            'identity': nn.Identity(),
         }
         # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
         self.attn = nn.Sequential(spatial_module_switch[spatial_module],
@@ -326,8 +344,8 @@ class C3SPP(C3):
 
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', gb_exp=0.5, g=1, e=0.5):
-        super().__init__(c1, c2, n, shortcut, attn, channel_module, g=g, e=e)
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', spatial_module='sa', gb_exp=0.5, g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, attn, channel_module, spatial_module, g=g, e=e)
         c_ = int(c2 * e)  # hidden channels
         self.m = nn.Sequential(*[GhostBottleneck(c_, c_, exp=gb_exp) for _ in range(n)])
 
