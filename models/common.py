@@ -143,15 +143,14 @@ class DilatedSpatialAttention(nn.Module):
 
         self.conv1 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False), nn.SiLU())
         self.conv2 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=2, dilation=2, bias=False), nn.SiLU())
-        self.conv3 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=4, dilation=4, bias=False), nn.SiLU())
-        self.cv = nn.Conv2d(2, 1, kernel_size=1, stride=1, bias=False)
+        self.conv3 = nn.Conv2d(2, 1, kernel_size=3, stride=1, padding=4, dilation=4, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         y = torch.cat([avg_out, max_out], dim=1)
-        y = self.cv(self.conv3(self.conv2(self.conv1(y))))
+        y = self.conv3(self.conv2(self.conv1(y)))
         out = x*self.sigmoid(y)
         return out
 
