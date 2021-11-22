@@ -142,14 +142,15 @@ class DilatedSpatialAttention(nn.Module):
         super().__init__()
 
         self.conv1 = Conv(2, 2, 5, 1, 5 // 2)
-        self.conv2 = Conv(2, 1, 5, 1, 5 // 2, act=False)
+        self.conv2 = Conv(2, 2, 5, 1, 5 // 2)
+        self.conv3 = Conv(2, 1, 1, 1, act=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         y = torch.cat([avg_out, max_out], dim=1)
-        y = self.conv2(self.conv1(y))
+        y = self.conv3(self.conv2(self.conv1(y)))
         return x * self.sigmoid(y)
 
 
@@ -285,7 +286,6 @@ class C3(nn.Module):
             'eca': eca_layer(c_),
             'deca': deca_layer(),
             'wca': wca_layer(),
-            'daeca': daeca_layer(),
             'identity': nn.Identity(),
         }
         spatial_module_switch = {
