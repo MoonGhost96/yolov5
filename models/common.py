@@ -487,7 +487,6 @@ class GhostBottleneckDownSample(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
         super().__init__()
 
         c_ = int(c2 * exp)
-        print(c_)
         c_ = c_ + 1 if c_ & 1 else c_
         self.cv1 = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
                                  GhostConv(c_, c1, 1, 1))  # pw-linear
