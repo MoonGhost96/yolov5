@@ -305,6 +305,33 @@ class C3(nn.Module):
         return out
 
 
+class C2(nn.Module):
+    # CSP Bottleneck with 2 convolutions
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', spatial_module='sa', g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super().__init__()
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, c_, 1, 1)
+        self.cv2 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
+        self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
+        channel_module_switch = {
+            'eca': eca_layer(c_),
+            'deca': deca_layer(),
+            'wca': wca_layer(),
+            'identity': nn.Identity(),
+        }
+        spatial_module_switch = {
+            'sa': SpatialAttention(),
+            'identity': nn.Identity(),
+        }
+        # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
+        self.attn = nn.Sequential(spatial_module_switch[spatial_module],
+                                  channel_module_switch[channel_module]) if attn else nn.Identity()
+
+    def forward(self, x):
+        x = self.cv1(x)
+        return self.cv2(torch.cat((self.attn(self.m(x)), x), dim=1))
+
+
 class GhostC3(nn.Module):
     # CSP Bottleneck with 3 convolutions
     def __init__(self, c1, c2, n=1, attn=False,
