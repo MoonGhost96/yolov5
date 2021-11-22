@@ -99,6 +99,29 @@ class deca_layer(nn.Module):
         return x * y.expand_as(x)
 
 
+class daeca_layer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv1 = nn.Conv1d(1, 1, kernel_size=3, padding=1, bias=False)
+        self.conv2 = nn.Conv1d(1, 1, kernel_size=3, padding=2, bias=False, dilation=2)
+        self.act = nn.SiLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # feature descriptor on the global spatial information
+        y = self.avg_pool(x)
+
+        # Two different branches of ECA module
+        y = self.act(self.conv1(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1))
+        y = self.conv2(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+
+        # Multi-scale information fusion
+        y = self.sigmoid(y)
+
+        return x * (1+y.expand_as(x))
+
+
 class wca_layer(nn.Module):
 
     def __init__(self, layers=2):
@@ -141,18 +164,16 @@ class DilatedSpatialAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=1, bias=False), nn.SiLU())
-        self.conv2 = nn.Sequential(nn.Conv2d(2, 2, kernel_size=3, stride=1, padding=2, dilation=2, bias=False), nn.SiLU())
-        self.conv3 = nn.Conv2d(2, 1, kernel_size=3, stride=1, padding=4, dilation=4, bias=False)
+        self.conv1 = Conv(2, 2, 5, 1, 5 // 2)
+        self.conv2 = Conv(2, 1, 5, 1, 5 // 2, act=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         y = torch.cat([avg_out, max_out], dim=1)
-        y = self.conv3(self.conv2(self.conv1(y)))
-        out = x*self.sigmoid(y)
-        return out
+        y = self.conv2(self.conv1(y))
+        return x * self.sigmoid(y)
 
 
 # Pelee: A Real-Time Object Detection System onMobileDevices
@@ -287,6 +308,7 @@ class C3(nn.Module):
             'eca': eca_layer(c_),
             'deca': deca_layer(),
             'wca': wca_layer(),
+            'daeca': daeca_layer(),
             'identity': nn.Identity(),
         }
         spatial_module_switch = {
@@ -481,6 +503,27 @@ class GhostBottleneck(nn.Module):
 
     def forward(self, x):
         return self.conv(x) + self.shortcut(x)
+
+
+class GhostBottleneckDownSample(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
+    def __init__(self, c1, c2, exp=0.5):  # ch_in, ch_out, kernel, stride
+        super().__init__()
+        # adaptive exp
+        if exp == -1:
+            g, b = solve_gb()
+            exp = get_exp(g, b, c2)
+
+        c_ = int(c2 * exp)
+        c_ = c_ + 1 if c_ & 1 else c_
+        self.cv1 = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
+                                 GhostConv(c_, c1, 1, 1))  # pw-linear
+
+        self.cv2 = Conv(c1, c1, 1, 1)
+        self.cv3 = nn.Sequential(DWConv(2*c1, 2*c1, 3, 2, act=False),
+                                 Conv(2*c1, c2, 1, 1))
+
+    def forward(self, x):
+        return self.cv3(torch.cat([self.cv1(x), self.cv2(x)], dim=1))
 
 
 class Contract(nn.Module):
