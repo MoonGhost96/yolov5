@@ -99,29 +99,6 @@ class deca_layer(nn.Module):
         return x * y.expand_as(x)
 
 
-class daeca_layer(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv1 = nn.Conv1d(1, 1, kernel_size=3, padding=1, bias=False)
-        self.conv2 = nn.Conv1d(1, 1, kernel_size=3, padding=2, bias=False, dilation=2)
-        self.act = nn.SiLU()
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        # feature descriptor on the global spatial information
-        y = self.avg_pool(x)
-
-        # Two different branches of ECA module
-        y = self.act(self.conv1(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1))
-        y = self.conv2(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
-
-        # Multi-scale information fusion
-        y = self.sigmoid(y)
-
-        return x * (1+y.expand_as(x))
-
-
 class wca_layer(nn.Module):
 
     def __init__(self, layers=2):
