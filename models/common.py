@@ -341,6 +341,14 @@ class C3SPP(C3):
         self.m = SPP(c_, c_, k)
 
 
+class C3SPPF(C3):
+    # C3 module with SPP()
+    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', spatial_module='sa', g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, attn, channel_module, spatial_module, g=g, e=e)
+        c_ = int(c2 * e)
+        self.m = GhostSPPF(c_, c_)
+
+
 class C3Ghost(C3):
     # C3 module with GhostBottleneck()
     def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', spatial_module='sa', gb_exp=0.5, g=1, e=0.5):
