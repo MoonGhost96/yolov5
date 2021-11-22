@@ -485,12 +485,9 @@ class GhostBottleneck(nn.Module):
 class GhostBottleneckDownSample(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
     def __init__(self, c1, c2, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
-        # adaptive exp
-        if exp == -1:
-            g, b = solve_gb()
-            exp = get_exp(g, b, c2)
 
         c_ = int(c2 * exp)
+        print(c_)
         c_ = c_ + 1 if c_ & 1 else c_
         self.cv1 = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
                                  GhostConv(c_, c1, 1, 1))  # pw-linear
