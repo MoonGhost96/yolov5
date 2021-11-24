@@ -499,6 +499,24 @@ class GhostBottleneckDownSample(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
         return self.cv3(torch.cat([self.cv1(x), self.cv2(x)], dim=1))
 
 
+class GhostBottleneckDownSampleD(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
+    def __init__(self, c1, c2, exp=0.5):  # ch_in, ch_out, kernel, stride
+        super().__init__()
+
+        self.ds = DWConv(c1, c1, 3, 2, act=False)
+        c_ = int(c2 * exp)
+        c_ = c_ + 1 if c_ & 1 else c_
+        self.cv1 = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
+                                 GhostConv(c_, c1, 1, 1))  # pw-linear
+
+        self.cv2 = Conv(c1, c1, 1, 1)
+        self.cv3 = Conv(2*c1, c2, 1, 1)
+
+    def forward(self, x):
+        x = self.ds(x)
+        return self.cv3(torch.cat([self.cv1(x), self.cv2(x)], dim=1))
+
+
 class Contract(nn.Module):
     # Contract width-height into channels, i.e. x(1,64,80,80) to x(1,256,40,40)
     def __init__(self, gain=2):
