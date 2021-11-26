@@ -141,8 +141,8 @@ class DilatedSpatialAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = Conv(2, 2, 5, 1, 5 // 2)
-        self.conv2 = Conv(2, 2, 5, 1, 5 // 2)
+        self.conv1 = nn.Sequential(nn.Conv2d(2, 2, 3, 1, 3, 3), nn.SiLU())
+        self.conv2 = nn.Sequential(nn.Conv2d(2, 2, 3, 1, 3, 3), nn.SiLU())
         self.conv3 = Conv(2, 1, 1, 1, act=False)
         self.sigmoid = nn.Sigmoid()
 
