@@ -141,8 +141,8 @@ class DilatedSpatialAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.conv1 = Conv(2, 2, 5, 1, 5 // 2)
-        self.conv2 = Conv(2, 2, 5, 1, 5 // 2)
+        self.conv1 = nn.Sequential(nn.Conv2d(2, 2, 3, 1, 4, 4), nn.SiLU())
+        self.conv2 = nn.Sequential(nn.Conv2d(2, 2, 3, 1, 4, 4), nn.SiLU())
         self.conv3 = Conv(2, 1, 1, 1, act=False)
         self.sigmoid = nn.Sigmoid()
 
@@ -503,7 +503,7 @@ class GhostBottleneckDownSampleD(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
     def __init__(self, c1, c2, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
 
-        self.ds = DWConv(c1, c1, 3, 2, act=False)
+        self.ds = DWConv(c1, c1, 5, 2, act=False)
         c_ = int(c2 * exp)
         c_ = c_ + 1 if c_ & 1 else c_
         self.cv1 = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
