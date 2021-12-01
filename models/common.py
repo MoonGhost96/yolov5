@@ -507,9 +507,9 @@ class GhostBottleneckDownSampleD(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
         c_ = int(c2 * exp)
         c_ = c_ + 1 if c_ & 1 else c_
         self.cv1 = nn.Sequential(GhostConv(c1, c_, 1, 1),  # pw
-                                 GhostConv(c_, c1, 1, 1))  # pw-linear
+                                 GhostConv(c_, c1, 1, 1, act=False))  # pw-linear
 
-        self.cv2 = Conv(c1, c1, 1, 1)
+        self.cv2 = Conv(c1, c1, 1, 1, act=False)
         self.cv3 = Conv(2*c1, c2, 1, 1)
 
     def forward(self, x):
