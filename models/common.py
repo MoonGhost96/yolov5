@@ -423,7 +423,7 @@ class GhostSPPF(nn.Module):
         super().__init__()
         c_ = c1 // 2  # hidden channels
         self.cv1 = GhostConv(c1, c_, 1, 1)  # 降维
-        self.cv2 = GhostConv(c_ * 4, c2, 1, 1)  # 降维
+        self.cv2 = GhostConv(c_ * 4, c2, 1, 1, act=False)  # 降维
         self.m = nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
 
     def forward(self, x):
