@@ -14,15 +14,15 @@ anchors:
 backbone:
   # [from, number, module, args]
   [[-1, 1, Focus, [32, 3]],  # 0-P1/2
-   [-1, 1, GhostBottleneck, [64, 3, 2, 1.5]],  # 1-P2/4
-   [-1, 1, C3Ghost, [64, True, True]],
-   [-1, 1, GhostBottleneck, [128, 3, 2, 1.5]],  # 3-P3/8
-   [-1, 3, C3Ghost, [128, True, True]],
-   [-1, 1, GhostBottleneck, [256, 3, 2, 1.5]],  # 5-P4/16
-   [-1, 3, C3Ghost, [256, True, True]],
-   [-1, 1, GhostBottleneck, [512, 3, 2, 1]],  # 7-P5/32
+   [-1, 1, GhostBottleneckDownSampleD, [64, 1]],  # 1-P2/4
+   [-1, 1, C3Ghost, [64, True, True, 'identity', 'identity']],
+   [-1, 1, GhostBottleneckDownSampleD, [128, 1]],  # 3-P3/8
+   [-1, 3, C3Ghost, [128, True, True, 'identity', 'identity']],
+   [-1, 1, GhostBottleneckDownSampleD, [256, 1]],  # 5-P4/16
+   [-1, 3, C3Ghost, [256, True, True, 'identity', 'identity']],
+   [-1, 1, GhostBottleneckDownSampleD, [512, 1]],  # 7-P5/32
    [-1, 1, SPP, [512, [5, 9, 13]]],
-   [-1, 1, C3Ghost, [512, False, True]],  # 9 (large)
+   [-1, 1, C3Ghost, [512, True, True, 'identity', 'identity']],  # 9 (large)
   ]
 
 # YOLOv5 head
