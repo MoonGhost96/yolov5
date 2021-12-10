@@ -1038,3 +1038,20 @@ class GhostConvSE(nn.Module):
     def forward(self, x):
         y = self.primary_conv(x)
         return torch.cat([y, self.cheap_operation(y)], 1)
+
+
+class Ctiny(nn.Module):
+    #yolov4-tiny bottleneck
+    def __init__(self,c1, c2, n=1,e=0.5):
+        super(Ctiny, self).__init__()
+        c_ = int(c2 * e)  # hidden channels
+        c1=c1//2
+        self.cv1 = Conv(c1, c_, 3, 1,act=nn.LeakyReLU(0.1, inplace=True))
+        self.cv2 = Conv(c1, c_, 3, 1,act=nn.LeakyReLU(0.1, inplace=True))
+        self.cv3 = Conv(2 * c_, c2, 1,act=nn.LeakyReLU(0.1, inplace=True))
+
+    def forward(self,x):
+        out = torch.chunk(x, 2, dim=1)
+        x1=out[1]
+        y=self.cv1(x1)
+        return self.cv3(torch.cat((self.cv2(y),y), dim=1))
