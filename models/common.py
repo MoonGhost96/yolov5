@@ -985,3 +985,56 @@ class NonLocalBlock(nn.Module):
         mask = self.conv_mask(mul_theta_phi_g)
         output = mask + x
         return output
+
+
+
+class GhostBottleneckSE(nn.Module):
+    # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
+    def __init__(self, c1, c2, midc, k=5, s=1, use_se = False):  # ch_in, ch_mid, ch_out, kernel, stride, use_se
+        super().__init__()
+        assert s in [1, 2]
+        c_ = midc
+        self.conv = nn.Sequential(GhostConvSE(c1, c_, 1, 1),              # Expansion
+                                  Conv(c_, c_, 3, s=2, p=1, g=c_, act=False) if s == 2 else nn.Identity(),  # dw
+                                  # Squeeze-and-Excite
+                                  SeBlock(c_) if use_se else nn.Sequential(),
+                                  GhostConvSE(c_, c2, 1, 1, act=False))   # Squeeze pw-linear
+
+        self.shortcut = nn.Identity() if (c1 == c2 and s == 1) else \
+                                                nn.Sequential(Conv(c1, c1, 3, s=s, p=1, g=c1, act=False), \
+                                                Conv(c1, c2, 1, 1, act=False)) # 避免stride=2时 通道数改变的情况
+
+    def forward(self, x):
+        # print(self.conv(x).shape)
+        # print(self.shortcut(x).shape)
+        return self.conv(x) + self.shortcut(x)
+
+
+class SeBlock(nn.Module):
+    def __init__(self, in_channel, reduction=4):
+        super().__init__()
+        self.Squeeze = nn.AdaptiveAvgPool2d(1)
+
+        self.Excitation = nn.Sequential()
+        self.Excitation.add_module('FC1', nn.Conv2d(in_channel, in_channel // reduction, kernel_size=1))  # 1*1卷积与此效果相同
+        self.Excitation.add_module('ReLU', nn.ReLU())
+        self.Excitation.add_module('FC2', nn.Conv2d(in_channel // reduction, in_channel, kernel_size=1))
+        self.Excitation.add_module('Sigmoid', nn.Sigmoid())
+
+    def forward(self, x):
+        y = self.Squeeze(x)
+        ouput = self.Excitation(y)
+        return x*(ouput.expand_as(x))
+
+
+class GhostConvSE(nn.Module):
+    # Ghost Convolution https://github.com/huawei-noah/ghostnet
+    def __init__(self, c1, c2, k=1, s=1, g=1, act=True):  # ch_in, ch_out, kernel, stride, groups
+        super().__init__()
+        c_ = c2 // 2  # hidden channels
+        self.primary_conv = Conv(c1, c_, k=1, s=1, act=act)
+        self.cheap_operation = Conv(c_, c_, k=3, s=1, p=1, g=c_, act=act)
+
+    def forward(self, x):
+        y = self.primary_conv(x)
+        return torch.cat([y, self.cheap_operation(y)], 1)
