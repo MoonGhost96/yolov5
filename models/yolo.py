@@ -261,7 +261,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             c2 = ch[f] // args[0] ** 2
         elif m is Fusion:
             c2 = ch[f[0]]
-        elif m is Sum:
+        elif m in [Sum, WcaSum]:
             c2 = ch[f[0]]
         else:
             c2 = ch[f]

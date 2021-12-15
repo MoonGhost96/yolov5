@@ -122,6 +122,25 @@ class wca_layer(nn.Module):
         return x * y.expand_as(x)
 
 
+class WcaSum(nn.Module):
+
+    def __init__(self, layers=2):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        dilation_rates = [2**(k-1) for k in range(1, layers+1)]
+        self.m = nn.Sequential(*[CircularConv1d(2, 2, 3, 1, d, d, True) for d in dilation_rates])
+        self.cv1 = nn.Conv1d(2, 1, 1, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x1, x2 = x[0], x[1]
+        y = torch.cat([self.avg_pool(x1).squeeze(-1).transpose(-1, -2), self.avg_pool(x2).squeeze(-1).transpose(-1, -2)], dim=1)
+        y = self.cv1(self.m(y))
+        w = y.transpose(-1, -2).unsqueeze(-1)
+        sw = self.sigmoid(w)
+        return x1*sw + x2*(1-sw)
+
+
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
