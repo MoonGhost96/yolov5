@@ -46,6 +46,7 @@ head:
    [-1, 1, DWConv, [128,5,2,2]],#25
    [10, 1, DWConv, [128,5,2,2]],#26
    [[-1, 25], 1, Sum, [2, True]],#27
+   [ -1, 1, C3Ghost, [ 128, False ] ],
 
-   [[18, 21, 24, 27], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
+   [[18, 21, 24, 28], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
   ]
