@@ -31,22 +31,21 @@ head:
    [-1, 1, C3Ghost, [128]],  # 14
 
    [-1, 1, nn.Upsample, [None, 2, 'nearest']],  #15
-   [4, 1, Conv, [128, 1, 1]], #16
-   [[-1, 16], 1, Sum, [2, True]],  # cat backbone P3  #17
-   [-1, 1, C3Ghost, [128]],  # 18 (P3/8-small)
+   [[4, -1], 1, Sum, [2, True]],  # cat backbone P3
+   [-1, 1, C3Ghost, [128]],  # 17 (P3/8-small)
 
-   [-1, 1, DWConv, [128,5,2,2]], #19 //下采样
+   [-1, 1, DWConv, [128,5,2,2]], #18 //下采样
    [[14, -1], 1, Sum, [2, True]],  # cat head P4
-   [-1, 1, C3Ghost, [128]],  # 21 (P4/16-medium)
+   [-1, 1, C3Ghost, [128]],  # 20 (P4/16-medium)
 
-   [ -1, 1, DWConv, [128,5,2,2] ], #22 //下采样
+   [ -1, 1, DWConv, [128,5,2,2] ], #21 //下采样
    [[10, -1], 1, Sum, [2, True]],  # cat head P5
-   [ -1, 1, C3Ghost, [ 128, False ] ],  # 24 (P5/32-large)
+   [ -1, 1, C3Ghost, [ 128, False ] ],  # 23 (P5/32-large)
 
-   [-1, 1, DWConv, [128,5,2,2]],#25
-   [10, 1, DWConv, [128,5,2,2]],#26
-   [[-1, 25], 1, Sum, [2, True]],#27
-   [ -1, 1, C3Ghost, [ 128, False ] ],
+   [-1, 1, DWConv, [128,5,2,2]],#24
+   [10, 1, DWConv, [128,5,2,2]],#25
+   [[-1, 24], 1, Sum, [2, True]],#26
+   [ -1, 1, C3Ghost, [ 128, False ] ], #27 (P6/xlarge)
 
-   [[18, 21, 24, 28], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
+   [[17, 20, 23, 27], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
   ]
