@@ -39,13 +39,13 @@ head:
    [-1, 1, C3Ghost, [128, False]],  # 18 (P3/8-small)
    [-1, 1, DilatedSpatialAttention, []],
 
-   [-1, 1, nn.MaxPool2d, [3,2,1]], #20 //下采样
+   [-1, 1, nn.MaxPool2d, [2,2,0]], #20 //下采样
    [[-1, 15], 1, Concat, [1]],  # cat head P4
    [[-1,6], 1, Sum, [2, True]],
    [-1, 1, C3Ghost, [256, False]],  # 23 (P4/16-medium)
    [-1, 1, DilatedSpatialAttention, []],
 
-   [ -1, 1, nn.MaxPool2d, [3,2,1] ], #25 //下采样
+   [ -1, 1, nn.MaxPool2d, [2,2,0] ], #25 //下采样
    [ [ -1, 10 ], 1, Concat, [1] ],  # cat head P5
    [ -1, 1, C3Ghost, [ 512, False ] ],  # 27 (P5/32-large)
 
