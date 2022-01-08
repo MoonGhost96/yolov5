@@ -47,6 +47,19 @@ class Sum(nn.Module):
         return y
 
 
+class ChannelWeightedSum(nn.Module):
+    def __init__(self, c):
+        super().__init__()
+        self.w = nn.Parameter(-torch.ones(c), requires_grad=True)  # layer weights
+
+    def forward(self, x):
+        y = x[0]  # no weight
+        w = torch.sigmoid(self.w) * 2
+        w = w.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+        y = y + x[1] * w
+        return y
+
+
 class MixConv2d(nn.Module):
     # Mixed Depth-wise Conv https://arxiv.org/abs/1907.09595
     def __init__(self, c1, c2, k=(1, 3), s=1, equal_ch=True):
