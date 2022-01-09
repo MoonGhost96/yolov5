@@ -87,7 +87,7 @@ class DCAChannelWeightedSum(nn.Module):
 
         self.dca = nn.Sequential()
         self.dca.add_module('Conv1', nn.Conv1d(2, 2, kernel_size=3, padding=1, bias=False, padding_mode='circular'))
-        self.dca.add_module('SiLU', nn.SiLU())
+        self.dca.add_module('ReLU', nn.ReLU())
         self.dca.add_module('Conv2', nn.Conv1d(2, 1, kernel_size=3, padding=2, bias=False, dilation=2, padding_mode='circular'))
         self.dca.add_module('Sigmoid', nn.Sigmoid())
 
