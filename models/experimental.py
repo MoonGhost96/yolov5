@@ -60,6 +60,26 @@ class ChannelWeightedSum(nn.Module):
         return y
 
 
+class SEChannelWeightedSum(nn.Module):
+    def __init__(self, c, reduction=4):
+        super().__init__()
+        self.Squeeze = nn.AdaptiveAvgPool2d(1)
+
+        self.Excitation = nn.Sequential()
+        self.Excitation.add_module('FC1', nn.Conv2d(2*c, c // reduction, kernel_size=1))  # 1*1卷积与此效果相同
+        self.Excitation.add_module('ReLU', nn.ReLU())
+        self.Excitation.add_module('FC2', nn.Conv2d(c // reduction, c, kernel_size=1))
+        self.Excitation.add_module('Sigmoid', nn.Sigmoid())
+
+    def forward(self, x):
+        x1, x2 = x[0], x[1]  # no weight
+        w1 = self.Squeeze(x1)
+        w2 = self.Squeeze(x2)
+        w = torch.cat([w1, w2], dim=1)
+        w = self.Excitation(w) * 2
+        return x1 + x2 * w
+
+
 class MixConv2d(nn.Module):
     # Mixed Depth-wise Conv https://arxiv.org/abs/1907.09595
     def __init__(self, c1, c2, k=(1, 3), s=1, equal_ch=True):
