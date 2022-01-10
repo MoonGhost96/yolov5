@@ -259,8 +259,11 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             c2 = ch[f] * args[0] ** 2
         elif m is Expand:
             c2 = ch[f] // args[0] ** 2
-        elif m in [Sum, WcaSum, ChannelWeightedSum, SEChannelWeightedSum, DCAChannelWeightedSum, Fusion]:
+        elif m in [Sum, WcaSum, ChannelWeightedSum, Fusion]:
             c2 = ch[f[0]]
+        elif m is SEChannelWeightedSum:
+            c2 = ch[f[0]]
+            args[0] = c2
         else:
             c2 = ch[f]
 

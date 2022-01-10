@@ -80,29 +80,6 @@ class SEChannelWeightedSum(nn.Module):
         return x1 + x2 * w
 
 
-class DCAChannelWeightedSum(nn.Module):
-    def __init__(self, c):
-        super().__init__()
-        self.Squeeze = nn.AdaptiveAvgPool2d(1)
-
-        self.dca = nn.Sequential()
-        self.dca.add_module('Conv1', nn.Conv1d(2, 2, kernel_size=3, padding=1, bias=False, padding_mode='circular'))
-        self.dca.add_module('ReLU', nn.ReLU())
-        self.dca.add_module('Conv2', nn.Conv1d(2, 1, kernel_size=3, padding=2, bias=False, dilation=2, padding_mode='circular'))
-        self.dca.add_module('Sigmoid', nn.Sigmoid())
-
-    def forward(self, x):
-        x1, x2 = x[0], x[1]  # no weight
-        w1 = self.Squeeze(x1)
-        w2 = self.Squeeze(x2)
-        w1 = w1.squeeze(-1).transpose(-1, -2)
-        w2 = w2.squeeze(-1).transpose(-1, -2)
-        w = torch.cat([w1, w2], dim=1)
-        w = self.dca(w) * 2
-        w = w.transpose(-1, -2).unsqueeze(-1)
-        return x1 + x2 * w
-
-
 class MixConv2d(nn.Module):
     # Mixed Depth-wise Conv https://arxiv.org/abs/1907.09595
     def __init__(self, c1, c2, k=(1, 3), s=1, equal_ch=True):
