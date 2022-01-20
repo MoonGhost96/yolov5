@@ -499,7 +499,6 @@ class GhostBottleneck(nn.Module):
                                       Conv(c1, c2, 1, 1, act=False)) if s == 2 and self.add else nn.Identity()
 
     def forward(self, x):
-        print(self.add)
         return self.conv(x) + self.shortcut(x) if self.add else self.conv(x)
 
 
