@@ -399,7 +399,7 @@ class C3Ghost(C3):
     def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', spatial_module='sa', gb_exp=0.5, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, attn, channel_module, spatial_module, g=g, e=e)
         c_ = int(c2 * e)  # hidden channels
-        self.m = nn.Sequential(*[GhostBottleneck(c_, c_, exp=gb_exp, shortcut=shortcut) for _ in range(n)])
+        self.m = nn.Sequential(*[GhostBottleneck(c_, c_, exp=gb_exp) for _ in range(n)])
 
 
 class SPP(nn.Module):
@@ -481,7 +481,7 @@ class GhostConv(nn.Module):
 
 class GhostBottleneck(nn.Module):
     # Ghost Bottleneck https://github.com/huawei-noah/ghostnet
-    def __init__(self, c1, c2, k=3, s=1, exp=0.5, shortcut=True):  # ch_in, ch_out, kernel, stride
+    def __init__(self, c1, c2, k=3, s=1, exp=0.5):  # ch_in, ch_out, kernel, stride
         super().__init__()
         # adaptive exp
         if exp == -1:
@@ -494,12 +494,11 @@ class GhostBottleneck(nn.Module):
                                   DWConv(c_, c_, k, s, act=False) if s == 2 else nn.Identity(),  # dw
                                   GhostConv(c_, c2, 1, 1, act=False))  # pw-linear
 
-        self.add = shortcut
         self.shortcut = nn.Sequential(DWConv(c1, c1, k, s, act=False),
-                                      Conv(c1, c2, 1, 1, act=False)) if s == 2 and self.add else nn.Identity()
+                                      Conv(c1, c2, 1, 1, act=False)) if s == 2 else nn.Identity()
 
     def forward(self, x):
-        return self.conv(x) + self.shortcut(x) if self.add else self.conv(x)
+        return self.conv(x) + self.shortcut(x)
 
 
 class GhostBottleneckDownSample(nn.Module):   # (b,c,w,h) - > (b,c*2,w//2,h//2)
