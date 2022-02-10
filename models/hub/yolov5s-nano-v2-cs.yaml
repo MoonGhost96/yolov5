@@ -1,0 +1,51 @@
+# parameters
+# voc 77.5 52.9
+nc: 80  # number of classes
+depth_multiple: 1.0  # model depth multiple
+width_multiple: 1.0  # layer channel multiple
+# batch 68 ~ 70
+# anchors
+anchors: 3
+
+# YOLOv5 backbone
+backbone:
+  # [from, number, module, args]
+  [[-1, 1, Focus, [32, 3]],  # 0-P1/2
+   [-1, 1, GhostBottleneckDownSampleD, [64, 1]],  # 1-P2/4
+   [-1, 1, C3Ghost, [64, True, True, 'wca', 'identity']],
+   [-1, 1, GhostBottleneckDownSampleD, [128, 1]],  # 3-P3/8
+   [-1, 3, C3Ghost, [128, True, True, 'wca', 'identity']],
+   [-1, 1, GhostBottleneckDownSampleD, [256, 1]],  # 5-P4/16
+   [-1, 3, C3Ghost, [256, True, True, 'wca', 'identity']],
+   [-1, 1, GhostBottleneckDownSampleD, [512, 1]],  # 7-P5/32
+   [-1, 1, GhostSPPF, [512]],
+   [-1, 1, C3Ghost, [512, True, True, 'wca', 'identity']],  # 9 (large)
+  ]
+
+# YOLOv5 head
+head:
+  [[-1, 1, Conv, [128, 1, 1]], #10 //降维
+   [-1, 1, nn.Upsample, [None, 2, 'nearest']], #11
+   [6, 1, Conv, [128, 1, 1]], #12
+   [[-1, 11], 1, CSSum, [128]],  # cat backbone P4 #13
+   [-1, 1, C3Ghost, [128]],  # 14
+
+   [-1, 1, nn.Upsample, [None, 2, 'nearest']],  #15
+   [[4, -1], 1, CSSum, [128]],  # cat backbone P3
+   [-1, 1, C3Ghost, [128]],  # 17 (P3/8-small)
+
+   [-1, 1, DWConv, [128,5,2,2]], #18 //下采样
+   [[14, -1], 1, CSSum, [128]],  # cat head P4
+   [-1, 1, C3Ghost, [128]],  # 20 (P4/16-medium)
+
+   [ -1, 1, DWConv, [128,5,2,2] ], #21 //下采样
+   [[10, -1], 1, CSSum, [128]],  # cat head P5
+   [ -1, 1, C3Ghost, [128] ],  # 23 (P5/32-large)
+
+   [-1, 1, DWConv, [128,5,2,2]],#24
+   [10, 1, DWConv, [128,5,2,2]],#25
+   [[-1, 24], 1, CSSum, [128]],#26
+   [ -1, 1, C3Ghost, [128] ], #27 (P6/xlarge)
+
+   [[17, 20, 23, 27], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
+  ]

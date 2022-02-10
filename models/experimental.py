@@ -80,6 +80,41 @@ class SEChannelWeightedSum(nn.Module):
         return x1 + x2 * w
 
 
+class CSSum(nn.Module):
+    def __init__(self, c, reduction=4):
+        super().__init__()
+        self.sigmoid = nn.Sigmoid()
+
+        # channel
+        self.Squeeze = nn.AdaptiveAvgPool2d(1)
+        self.Excitation = nn.Sequential()
+        self.Excitation.add_module('FC1', nn.Conv2d(2 * c, c // reduction, kernel_size=1))  # 1*1卷积与此效果相同
+        self.Excitation.add_module('ReLU', nn.ReLU())
+        self.Excitation.add_module('FC2', nn.Conv2d(c // reduction, c, kernel_size=1))
+
+        # spatial
+        self.conv1 = nn.Sequential(nn.Conv2d(4, 4, 3, 1, 4, 4), nn.SiLU())
+        self.conv2 = nn.Sequential(nn.Conv2d(4, 4, 3, 1, 4, 4), nn.SiLU())
+        self.conv3 = Conv(4, 1, 1, 1, act=False)
+
+
+    def forward(self, x):
+        x1, x2 = x[0], x[1]
+        # channel
+        w1 = torch.cat([self.Squeeze(x1), self.Squeeze(x2)], dim=1)
+        w1 = self.sigmoid(self.Excitation(w1)) * 2
+
+        # spatial
+        avg_out_x1 = torch.mean(x1, dim=1, keepdim=True)
+        max_out_x1, _ = torch.max(x1, dim=1, keepdim=True)
+        avg_out_x2 = torch.mean(x2, dim=1, keepdim=True)
+        max_out_x2, _ = torch.max(x2, dim=1, keepdim=True)
+        w2 = torch.cat([avg_out_x1, max_out_x1, avg_out_x2, max_out_x2], dim=1)
+        w2 = self.sigmoid(self.conv3(self.conv2(self.conv1(w2)))) * 2
+
+        return x1 + x2 * w1 * w2
+
+
 class MixConv2d(nn.Module):
     # Mixed Depth-wise Conv https://arxiv.org/abs/1907.09595
     def __init__(self, c1, c2, k=(1, 3), s=1, equal_ch=True):

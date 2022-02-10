@@ -122,25 +122,6 @@ class wca_layer(nn.Module):
         return x * y.expand_as(x)
 
 
-class WcaSum(nn.Module):
-
-    def __init__(self, layers=2):
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        dilation_rates = [2**(k-1) for k in range(1, layers+1)]
-        self.m = nn.Sequential(*[CircularConv1d(2, 2, 3, 1, d, d, True) for d in dilation_rates])
-        self.cv1 = nn.Conv1d(2, 1, 1, 1, bias=False)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        x1, x2 = x[0], x[1]
-        y = torch.cat([self.avg_pool(x1).squeeze(-1).transpose(-1, -2), self.avg_pool(x2).squeeze(-1).transpose(-1, -2)], dim=1)
-        y = self.cv1(self.m(y))
-        w = y.transpose(-1, -2).unsqueeze(-1)
-        sw = self.sigmoid(w)
-        return x1*sw + x2*(1-sw)
-
-
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
@@ -321,33 +302,6 @@ class C3(nn.Module):
         y1 = self.attn(y1)
         out = self.cv3(torch.cat((y1, y2), dim=1))
         return out
-
-
-class C2(nn.Module):
-    # CSP Bottleneck with 2 convolutions
-    def __init__(self, c1, c2, n=1, shortcut=True, attn=False, channel_module='eca', spatial_module='sa', g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
-        super().__init__()
-        c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, 1, 1)
-        self.cv2 = Conv(2 * c_, c2, 1)  # act=FReLU(c2)
-        self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
-        channel_module_switch = {
-            'eca': eca_layer(c_),
-            'deca': deca_layer(),
-            'wca': wca_layer(),
-            'identity': nn.Identity(),
-        }
-        spatial_module_switch = {
-            'sa': SpatialAttention(),
-            'identity': nn.Identity(),
-        }
-        # self.m = nn.Sequential(*[CrossConv(c_, c_, 3, 1, g, 1.0, shortcut) for _ in range(n)])
-        self.attn = nn.Sequential(spatial_module_switch[spatial_module],
-                                  channel_module_switch[channel_module]) if attn else nn.Identity()
-
-    def forward(self, x):
-        x = self.cv1(x)
-        return self.cv2(torch.cat((self.attn(self.m(x)), x), dim=1))
 
 
 class GhostC3(nn.Module):
