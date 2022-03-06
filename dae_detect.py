@@ -22,7 +22,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, colo
     apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box, area_kmeans, \
     to_square
 from utils.plots import colors, plot_one_box
-from utils.torch_utils import select_device, load_classifier, time_synchronized
+from utils.torch_utils import select_device, load_classifier, time_sync
 
 
 @torch.no_grad()
@@ -99,7 +99,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             img = img.unsqueeze(0)
 
         # Inference
-        t1 = time_synchronized()
+        t1 = time_sync()
         pred = model(img, augment=augment)[0]
 
         # Apply NMS
@@ -112,7 +112,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         if square:
             pred = to_square(pred,img.shape[3],img.shape[2])
 
-        t2 = time_synchronized()
+        t2 = time_sync()
 
         # Apply Classifier
         if classify:
